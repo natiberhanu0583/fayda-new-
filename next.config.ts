@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   api: {
     bodyParser: {
       sizeLimit: '10mb', // Increase to 10MB or more as needed
@@ -33,4 +34,4 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+export default nextConfig
