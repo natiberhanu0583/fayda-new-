@@ -1060,6 +1060,9 @@ function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTe
   const [hue, setHue] = useState<number>(0);
   const [saturation, setSaturation] = useState<number>(100);
   const [lightness, setLightness] = useState<number>(100);
+  const [contrast, setContrast] = useState<number>(100);
+  const [grayscale, setGrayscale] = useState<number>(0);
+  const [sepia, setSepia] = useState<number>(0);
 
   const defaultFrontImageUrl = '/front-template.jpg';
   const defaultBackImageUrl = '/back-template.jpg';
@@ -1232,6 +1235,51 @@ function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTe
                   className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 />
               </div>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label htmlFor={`contrast-${index}`} className="text-xs font-bold text-slate-500 uppercase">Contrast</Label>
+                  <span className="text-xs font-mono text-slate-400">{contrast}%</span>
+                </div>
+                <input
+                  id={`contrast-${index}`}
+                  type="range"
+                  min="0"
+                  max="200"
+                  value={contrast}
+                  onChange={(e) => setContrast(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label htmlFor={`grayscale-${index}`} className="text-xs font-bold text-slate-500 uppercase">Grayscale</Label>
+                  <span className="text-xs font-mono text-slate-400">{grayscale}%</span>
+                </div>
+                <input
+                  id={`grayscale-${index}`}
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={grayscale}
+                  onChange={(e) => setGrayscale(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label htmlFor={`sepia-${index}`} className="text-xs font-bold text-slate-500 uppercase">Sepia</Label>
+                  <span className="text-xs font-mono text-slate-400">{sepia}%</span>
+                </div>
+                <input
+                  id={`sepia-${index}`}
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={sepia}
+                  onChange={(e) => setSepia(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+              </div>
             </div>
             <div className="mt-4 flex justify-end">
               <Button
@@ -1241,6 +1289,9 @@ function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTe
                   setHue(0);
                   setSaturation(100);
                   setLightness(100);
+                  setContrast(100);
+                  setGrayscale(0);
+                  setSepia(0);
                 }}
                 className="text-xs text-slate-500 hover:text-blue-600"
               >
@@ -1296,7 +1347,7 @@ function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTe
                       height: '540px',
                       objectFit: 'cover',
                       borderRadius: '8px',
-                      filter: `hue-rotate(${hue}deg) saturate(${saturation}%) brightness(${lightness}%)`
+                      filter: `hue-rotate(${hue}deg) saturate(${saturation}%) brightness(${lightness}%) contrast(${contrast}%) grayscale(${grayscale}%) sepia(${sepia}%)`
                     }}
                   />
                   <img crossOrigin="anonymous"
