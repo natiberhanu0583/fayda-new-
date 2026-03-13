@@ -1704,7 +1704,7 @@ function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTe
                     alt="Profile"
                     className="absolute"
                     style={{
-                      top: '160px',
+                      top: '140px',
                       left: '55px',
                       width: '440px',
                       height: '540px',
