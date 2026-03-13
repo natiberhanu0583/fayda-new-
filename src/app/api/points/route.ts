@@ -4,8 +4,8 @@ import { auth } from '@/lib/auth'; // Your Better Auth instance
 
 const prisma = new PrismaClient();
 
-// Revalidate every 5 minutes
-export const revalidate = 300;
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
 

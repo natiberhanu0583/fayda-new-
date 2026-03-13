@@ -1,17 +1,24 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb', // Increase to 10MB or more as needed
-    },
-  },
-
   typescript: {
     ignoreBuildErrors: true
   },
 
   images: {
-    domains: ["api.affiliate.pro.et", "faydaprint.com"],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'api.affiliate.pro.et',
+        port: '',
+        pathname: '/images/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'faydaprint.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
   },
 
   async rewrites() {
@@ -21,15 +28,6 @@ const nextConfig = {
         destination: 'https://api.affiliate.pro.et/images/:path*',
       },
     ]
-  },
-
-  // If using App Router with server actions:
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '10mb',
-
-    },
-    turbo: false,
   },
 }
 
