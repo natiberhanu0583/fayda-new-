@@ -707,46 +707,35 @@ export default function Home() {
                       </div>
 
                       {/* Quick Add Buttons */}
-                      <div className="flex flex-wrap gap-3 justify-center">
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            const currentLength = multiScreenshotSets.length;
-                            const toAdd = Math.min(3, 5 - currentLength);
-                            for (let i = 0; i < toAdd; i++) {
-                              addScreenshotSet();
-                            }
-                          }}
-                          disabled={multiScreenshotSets.length >= 5}
-                          className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Add ID 1, ID 2, ID 3
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            const currentLength = multiScreenshotSets.length;
-                            const toAdd = Math.min(2, 5 - currentLength);
-                            for (let i = 0; i < toAdd; i++) {
-                              addScreenshotSet();
-                            }
-                          }}
-                          disabled={multiScreenshotSets.length >= 4}
-                          className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Add ID 1, ID 2
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={addScreenshotSet}
-                          disabled={multiScreenshotSets.length >= 5}
-                          className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Add ID 1
-                        </Button>
+                      <div className="grid grid-cols-5 gap-2">
+                        {[1, 2, 3, 4, 5].map((idNum) => (
+                          <Button
+                            key={idNum}
+                            type="button"
+                            onClick={() => {
+                              if (multiScreenshotSets.length < 5) {
+                                addScreenshotSet();
+                              }
+                            }}
+                            disabled={multiScreenshotSets.length >= 5}
+                            className={`w-full flex items-center justify-center gap-1 ${
+                              multiScreenshotSets.length >= 5
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : idNum === 1 
+                                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                  : idNum === 2
+                                  ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                                  : idNum === 3
+                                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                                  : idNum === 4
+                                  ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                                  : 'bg-red-600 hover:bg-red-700 text-white'
+                            }`}
+                          >
+                            <Plus className="h-3 w-3" />
+                            ID {idNum}
+                          </Button>
+                        ))}
                       </div>
 
                       {multiScreenshotSets.length === 0 ? (
