@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Upload, Download, Loader2, Printer, Coins, Image as ImageIcon, X, Shield, LogOut, Plus } from "lucide-react";
+import { Upload, Download, Loader2, Printer, Coins, Image as ImageIcon, X, Shield, LogOut, Plus, FileText } from "lucide-react";
 import axios from "axios";
 import Barcode from "react-barcode";
 import { signOut, useSession } from "@/lib/auth-client";
@@ -578,71 +578,79 @@ export default function Home() {
                 Upload Screenshot
               </button>
             </div>
-
             {/* Upload Section */}
             <div className="space-y-6">
               {activeTab === 'pdf' ? (
                 <form onSubmit={handleUpload} className="space-y-6">
                   <div className="space-y-3">
                     <Label htmlFor="pdf-upload" className="text-slate-700 font-medium text-lg">
-                      Select PDF Files (Max 5)
+                      Upload Multiple PDF Files (Max 5)
                     </Label>
+                    <p className="text-slate-500 text-sm">
+                      Upload individual PDF files in separate spaces. Each PDF will be processed separately.
+                    </p>
 
-                    {/* Drag and Drop Area */}
-                    <div
-                      className={`border-2 border-dashed rounded-xl p-2 text-center cursor-pointer transition-all duration-200 ${isDragOver
-                        ? 'border-blue-400 bg-blue-50'
-                        : 'border-blue-200 hover:border-blue-400 bg-blue-25'
-                        }`}
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onDrop={handleDrop}
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <div className="flex flex-col items-center justify-center gap-4">
-                        <Upload className="h-12 w-12 text-blue-400" />
-                        <div className="space-y-2">
-                          <p className="text-lg font-medium text-slate-700">
-                            Drag and drop your PDF files here
-                          </p>
-                          <p className="text-sm text-slate-500">
-                            or click to browse
-                          </p>
-                        </div>
-
-                        {/* File List Display */}
-                        {files.length > 0 && (
-                          <div className="mt-4 w-full px-8">
-                            <ul className="space-y-2">
-                              {files.map((f, i) => (
-                                <li key={i} className="flex justify-between items-center bg-green-50 p-3 rounded-lg border border-green-200">
-                                  <span className="text-green-700 font-medium truncate max-w-[80%]">{f.name}</span>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => { e.stopPropagation(); removeFile(i); }}
-                                    className="text-red-500 hover:bg-red-100 hover:text-red-700 h-8 w-8 p-0"
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </li>
-                              ))}
-                            </ul>
-                            <p className="text-right text-xs text-slate-500 mt-2">{files.length} / 5 files selected</p>
+                    {/* Multiple Individual PDF Upload Spaces */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {[1, 2, 3, 4, 5].map((num) => (
+                        <div key={num} className="space-y-2">
+                          <div className="text-center space-y-1">
+                            <Label className="text-teal-600 font-bold text-base block">
+                              PDF {num}
+                            </Label>
+                            <p className="text-slate-500 text-xs">
+                              Ethiopian ID Card PDF
+                            </p>
                           </div>
-                        )}
-                      </div>
-
-                      <Input
-                        ref={fileInputRef}
-                        id="pdf-upload"
-                        type="file"
-                        accept="application/pdf"
-                        multiple
-                        onChange={handleFileSelect}
-                        className="hidden"
-                      />
+                          <div
+                            className={`relative border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all duration-200 h-32 flex flex-col items-center justify-center ${files[num - 1]
+                              ? 'border-green-200 bg-green-50'
+                              : 'border-blue-100 hover:border-blue-300 bg-slate-50/50'
+                              }`}
+                            onClick={() => document.getElementById(`pdf-${num}`)?.click()}
+                          >
+                            {files[num - 1] ? (
+                              <div className="w-full h-full relative">
+                                <div className="flex flex-col items-center justify-center h-full">
+                                  <FileText className="h-8 w-8 text-green-600 mb-2" />
+                                  <span className="text-green-700 font-medium text-xs truncate w-full px-2 text-center">
+                                    {files[num - 1].name}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeFile(num - 1);
+                                    }}
+                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 z-10"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <Upload className="h-6 w-6 text-blue-200 mb-2" />
+                                <div className="bg-slate-200/50 shadow-sm px-3 py-1 rounded-lg text-slate-700 font-medium text-xs hover:bg-slate-200 transition-colors">
+                                  Select PDF
+                                </div>
+                              </>
+                            )}
+                            <Input
+                              type="file"
+                              accept="application/pdf"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                const newFiles = [...files];
+                                newFiles[num - 1] = file;
+                                setFiles(newFiles);
+                              }}
+                              className="hidden"
+                              id={`pdf-${num}`}
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
 
                     <Button
