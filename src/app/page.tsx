@@ -158,6 +158,17 @@ export default function Home() {
     }
   }, [user?.id]);
 
+  // Ensure screenshot sets exist for active ID section
+  useEffect(() => {
+    if (activeIdSection && multiScreenshotSets.length < activeIdSection) {
+      const newSets = [...multiScreenshotSets];
+      for (let i = multiScreenshotSets.length; i < activeIdSection; i++) {
+        newSets.push([null, null, null]);
+      }
+      setMultiScreenshotSets(newSets);
+    }
+  }, [activeIdSection, multiScreenshotSets.length]);
+
   // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -199,20 +210,11 @@ export default function Home() {
   };
 
   const handleIdButtonClick = (idNumber: number) => {
-    // Toggle the section - if clicking the same ID, close it; otherwise open the new one
+    // Simple toggle logic
     if (activeIdSection === idNumber) {
       setActiveIdSection(null);
     } else {
       setActiveIdSection(idNumber);
-      // Ensure we have enough sets for this ID - add all needed sets at once
-      const currentLength = multiScreenshotSets.length;
-      if (currentLength < idNumber) {
-        const newSets = [...multiScreenshotSets];
-        for (let i = currentLength; i < idNumber; i++) {
-          newSets.push([null, null, null]);
-        }
-        setMultiScreenshotSets(newSets);
-      }
     }
   };
 
@@ -764,7 +766,7 @@ export default function Home() {
                       </div>
 
                       {/* Individual ID Sections - Only show active one */}
-                      {activeIdSection && multiScreenshotSets[activeIdSection - 1] && (
+                      {activeIdSection && (
                         <div className="space-y-6 border-t border-blue-100 pt-6">
                           <div className="flex justify-between items-center">
                             <h3 className="text-lg font-semibold text-slate-800">
@@ -796,15 +798,16 @@ export default function Home() {
                                     </p>
                                   </div>
                                   <div
-                                    className={`relative border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-all duration-200 h-48 flex flex-col items-center justify-center ${multiScreenshotSets[activeIdSection - 1][num - 1]
-                                      ? 'border-green-200 bg-green-50'
-                                      : 'border-blue-100 hover:border-blue-300 bg-slate-50/50'
+                                    className={`relative border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-all duration-200 h-48 flex flex-col items-center justify-center ${
+                                      (multiScreenshotSets[activeIdSection - 1] && multiScreenshotSets[activeIdSection - 1][num - 1])
+                                        ? 'border-green-200 bg-green-50'
+                                        : 'border-blue-100 hover:border-blue-300 bg-slate-50/50'
                                       }`}
                                     onClick={() => document.getElementById(`active-screenshot-${num}`)?.click()}
                                     onDragOver={(e) => handleScreenshotDragOver(e)}
                                     onDrop={(e) => handleMultiScreenshotDrop(e, activeIdSection - 1, num - 1)}
                                   >
-                                    {multiScreenshotSets[activeIdSection - 1][num - 1] ? (
+                                    {(multiScreenshotSets[activeIdSection - 1] && multiScreenshotSets[activeIdSection - 1][num - 1]) ? (
                                       <div className="w-full h-full relative">
                                         <Image
                                           src={URL.createObjectURL(multiScreenshotSets[activeIdSection - 1][num - 1]!)}
