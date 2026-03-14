@@ -631,6 +631,23 @@ export default function Home() {
                               : 'border-blue-100 hover:border-blue-300 bg-slate-50/50'
                               }`}
                             onClick={() => document.getElementById(`pdf-${num}`)?.click()}
+                            onDragOver={(e) => handleDragOver(e)}
+                            onDragLeave={(e) => handleDragLeave(e)}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const droppedFiles = Array.from(e.dataTransfer.files);
+                              if (droppedFiles.length > 0) {
+                                const file = droppedFiles[0];
+                                if (file.type === 'application/pdf') {
+                                  const newFiles = [...files];
+                                  newFiles[num - 1] = file;
+                                  setFiles(newFiles);
+                                } else {
+                                  setError('Please drop a PDF file');
+                                }
+                              }
+                            }}
                           >
                             {files[num - 1] ? (
                               <div className="w-full h-full relative">
@@ -651,6 +668,7 @@ export default function Home() {
                                   </button>
                                 </div>
                               </div>
+                              </div>
                             ) : (
                               <>
                                 <Upload className="h-6 w-6 text-blue-200 mb-2" />
@@ -659,6 +677,7 @@ export default function Home() {
                                 </div>
                               </>
                             )}
+                            </div>
                             <Input
                               type="file"
                               accept="application/pdf"
@@ -752,4 +771,4 @@ export default function Home() {
 
                       {/* Individual ID Sections - Only show active one */}
                       {activeIdSection && (
-                        <div className="space-y-6 border-t border-blue-100 pt-6">
+                        <div className="space-y-6 border-t border-blue-100 pt-6">
