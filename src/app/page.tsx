@@ -124,6 +124,7 @@ export default function Home() {
   const [screenshotFiles, setScreenshotFiles] = useState<(File | null)[]>([null, null, null]);
   const [isMultiScreenshotMode, setIsMultiScreenshotMode] = useState(true);
   const [multiScreenshotSets, setMultiScreenshotSets] = useState<(File | null)[][]>([]);
+  const [activeIdSection, setActiveIdSection] = useState<number | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -193,6 +194,19 @@ export default function Home() {
         setScreenshotFiles(newFiles);
       } else {
         setError('Please drop an image file');
+      }
+    }
+  };
+
+  const handleIdButtonClick = (idNumber: number) => {
+    // Toggle the section - if clicking the same ID, close it; otherwise open the new one
+    if (activeIdSection === idNumber) {
+      setActiveIdSection(null);
+    } else {
+      setActiveIdSection(idNumber);
+      // Ensure we have enough sets for this ID
+      while (multiScreenshotSets.length < idNumber) {
+        setMultiScreenshotSets(prev => [...prev, [null, null, null]]);
       }
     }
   };
@@ -712,15 +726,21 @@ export default function Home() {
                           <Button
                             key={idNum}
                             type="button"
-                            onClick={() => {
-                              if (multiScreenshotSets.length < 5) {
-                                addScreenshotSet();
-                              }
-                            }}
+                            onClick={() => handleIdButtonClick(idNum)}
                             disabled={multiScreenshotSets.length >= 5}
                             className={`w-full flex items-center justify-center gap-1 ${
                               multiScreenshotSets.length >= 5
                                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : activeIdSection === idNum
+                                ? idNum === 1 
+                                  ? 'bg-blue-700 text-white'
+                                  : idNum === 2
+                                  ? 'bg-purple-700 text-white'
+                                  : idNum === 3
+                                  ? 'bg-green-700 text-white'
+                                  : idNum === 4
+                                  ? 'bg-orange-700 text-white'
+                                  : 'bg-red-700 text-white'
                                 : idNum === 1 
                                   ? 'bg-blue-600 hover:bg-blue-700 text-white'
                                   : idNum === 2
@@ -737,6 +757,92 @@ export default function Home() {
                           </Button>
                         ))}
                       </div>
+
+                      {/* Individual ID Sections - Only show active one */}
+                      {activeIdSection && multiScreenshotSets[activeIdSection - 1] && (
+                        <div className="space-y-6 border-t border-blue-100 pt-6">
+                          <div className="flex justify-between items-center">
+                            <h3 className="text-lg font-semibold text-slate-800">
+                              ID Card {activeIdSection}
+                            </h3>
+                            <Button
+                              type="button"
+                              onClick={() => setActiveIdSection(null)}
+                              variant="outline"
+                              className="border-gray-200 text-gray-600 hover:bg-gray-50"
+                            >
+                              <X className="h-4 w-4 mr-2" />
+                              Close
+                            </Button>
+                          </div>
+                          
+                          <div className="border rounded-xl p-4 bg-slate-50">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              {[1, 2, 3].map((num) => (
+                                <div key={num} className="space-y-2">
+                                  <div className="text-center space-y-1">
+                                    <Label className="text-teal-600 font-bold text-sm block">
+                                      Image {num} {num === 1 ? '(Optional)' : ''}
+                                    </Label>
+                                    <p className="text-slate-500 text-xs">
+                                      {num === 1 ? 'Photo + QR Popup' :
+                                        num === 2 ? 'Front of ID Card' :
+                                          'Back of ID Card'}
+                                    </p>
+                                  </div>
+                                  <div
+                                    className={`relative border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-all duration-200 h-48 flex flex-col items-center justify-center ${multiScreenshotSets[activeIdSection - 1][num - 1]
+                                      ? 'border-green-200 bg-green-50'
+                                      : 'border-blue-100 hover:border-blue-300 bg-slate-50/50'
+                                      }`}
+                                    onClick={() => document.getElementById(`active-screenshot-${num}`)?.click()}
+                                    onDragOver={(e) => handleScreenshotDragOver(e)}
+                                    onDrop={(e) => handleMultiScreenshotDrop(e, activeIdSection - 1, num - 1)}
+                                  >
+                                    {multiScreenshotSets[activeIdSection - 1][num - 1] ? (
+                                      <div className="w-full h-full relative">
+                                        <Image
+                                          src={URL.createObjectURL(multiScreenshotSets[activeIdSection - 1][num - 1]!)}
+                                          alt={`ID ${activeIdSection} - Image ${num}`}
+                                          fill
+                                          className="object-contain"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            updateScreenshotSet(activeIdSection - 1, num - 1, null);
+                                          }}
+                                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 z-10"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <Upload className="h-5 w-5 text-blue-200 mb-2" />
+                                        <div className="bg-slate-200/50 shadow-sm px-4 py-1 rounded-lg text-slate-700 font-medium text-xs hover:bg-slate-200 transition-colors">
+                                          Select
+                                        </div>
+                                      </>
+                                    )}
+                                    <Input
+                                      id={`active-screenshot-${num}`}
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0] || null;
+                                        updateScreenshotSet(activeIdSection - 1, num - 1, file);
+                                      }}
+                                      className="hidden"
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {multiScreenshotSets.length === 0 ? (
                         <div className="text-center py-12 border-2 border-dashed border-blue-200 rounded-xl">
@@ -830,7 +936,7 @@ export default function Home() {
                   )}
 
                   {/* Preview All Uploaded IDs */}
-                  {false && ( // Disabled: isMultiScreenshotMode && multiScreenshotSets.some(set => set.some(file => file !== null)) && (
+                  {true && ( // Disabled: isMultiScreenshotMode && multiScreenshotSets.some(set => set.some(file => file !== null)) && (
                     <div className="space-y-4 border-t border-blue-100 pt-6">
                       <h3 className="text-lg font-semibold text-slate-800">Preview All Uploaded IDs</h3>
                       <div className="space-y-4">
