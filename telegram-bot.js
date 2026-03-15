@@ -1,14 +1,19 @@
+const bwipjs = require('bwip-js');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config({ path: '.env.local' });
 const { Telegraf, session } = require('telegraf');
 const axios = require('axios');
 const FormData = require('form-data');
-const path = require('path');
 const { createCanvas, loadImage, registerFont } = require('canvas');
 
 // Register fonts for Amharic support
 try {
-    registerFont(path.join(__dirname, 'public', 'NOKIA ኖኪያ ቀላል.TTF'), { family: 'AmharicFont' });
-    registerFont(path.join(__dirname, 'public', 'NOKIAPUREHEADLINE.TTF'), { family: 'AmharicHeadline' });
+    const fontPath = path.join(__dirname, 'public', 'NOKIA ኖኪያ ቀላል.TTF');
+    const headlinePath = path.join(__dirname, 'public', 'NOKIAPUREHEADLINE.TTF');
+    if (fs.existsSync(fontPath)) registerFont(fontPath, { family: 'AmharicFont' });
+    if (fs.existsSync(headlinePath)) registerFont(headlinePath, { family: 'AmharicHeadline' });
+    console.log('Fonts registered successfully');
 } catch (e) {
     console.error('Font registration failed:', e.message);
 }
@@ -27,11 +32,12 @@ bot.start((ctx) => {
 });
 
 bot.command('skip', (ctx) => {
-    if (!ctx.session || ctx.session.step !== 0) return ctx.reply('Invalid command for this step.');
+    if (!ctx.session || (ctx.session.step !== 0 && ctx.session.step !== 1)) return ctx.reply('Invalid command for this step.');
     
-    ctx.session.images.push(null);
-    ctx.session.step = 1;
-    ctx.reply('Skipped Image 1. Now please upload **Image 2 (Front ID Card)**.');
+    ctx.session.images[ctx.session.step] = null;
+    ctx.session.step++;
+    const nextMsg = ctx.session.step === 1 ? 'Now please upload **Image 2 (Front ID Card)**.' : 'Now please upload **Image 3 (Back ID Card)**.';
+    ctx.reply('Skipped. ' + nextMsg);
 });
 
 bot.on('photo', async (ctx) => {
@@ -80,6 +86,7 @@ async function processId(ctx) {
 
         if (response.data) {
             const data = response.data;
+            data.source = 'screenshot'; // Mark as screenshot for bot processing
             
             // 1. Send Text Info
             let message = `✅ **ID Processed!**\n\n`;
@@ -104,6 +111,13 @@ async function processId(ctx) {
     }
 }
 
+function getFullUrl(path) {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+    return `https://api.affiliate.pro.et/${cleanPath}`;
+}
+
 async function renderTemplates(ctx, data) {
     try {
         const canvas = createCanvas(1280, 800);
@@ -113,44 +127,112 @@ async function renderTemplates(ctx, data) {
         const frontTpl = await loadImage(path.join(__dirname, 'public', 'front-template.jpg'));
         g.drawImage(frontTpl, 0, 0, 1280, 800);
 
-        // Profile Photo
-        if (data.images && data.images[1]) {
+        // Photo (Index 1 is usually the profile)
+        const profilePath = data.images && (data.images[1] || data.images[0]);
+        if (profilePath) {
             try {
-                const profileImg = await loadImage(`https://api.affiliate.pro.et${data.images[1]}`);
+                const profileImg = await loadImage(getFullUrl(profilePath));
+                
+                // Apply filters if supported by this canvas version
+                // Saturation: 45%, Brightness: 100%, Grayscale: 74%, Sepia: 10%
+                g.save();
+                if (g.filter !== undefined) {
+                    g.filter = 'saturate(45%) brightness(100%) grayscale(74%) sepia(10%)';
+                }
                 g.drawImage(profileImg, 55, 170, 440, 540);
-            } catch (e) {}
+                g.restore();
+            } catch (e) {
+                console.error('Failed to load profile image:', e.message);
+            }
         }
         
-        // Mini Photo
-        if (data.images && data.images[0]) {
+        // Mini Photo (Index 0 is usually the original)
+        const miniPath = data.images && data.images[0];
+        if (miniPath) {
             try {
-                const miniImg = await loadImage(`https://api.affiliate.pro.et${data.images[0]}`);
-                g.drawImage(miniImg, 1030, 600, 100, 130);
+                const miniImg = await loadImage(getFullUrl(miniPath));
+                g.drawImage(miniImg, 1030, 600, 100, 130); // Mini profile pos
             } catch (e) {}
+        }
+
+        // QR Code (Index 3 for screenshots)
+        const qrPath = data.images && (data.images[3] || data.images[2]);
+        if (qrPath) {
+            try {
+                const qrImg = await loadImage(getFullUrl(qrPath));
+                // QR Code position (approximate, usually on the right side)
+                g.drawImage(qrImg, 1070, 175, 150, 150);
+            } catch (e) {}
+        }
+
+        // Barcode
+        if (data.fcn_id) {
+            const cleanFcn = data.fcn_id.replace(/\s/g, '');
+            try {
+                const barcodeBuffer = await bwipjs.toBuffer({
+                    bcid: 'code128',
+                    text: cleanFcn,
+                    scale: 3,
+                    height: 10,
+                    includetext: false,
+                    backgroundcolor: 'FFFFFF'
+                });
+                const barcodeImg = await loadImage(barcodeBuffer);
+                // Draw white background for barcode area
+                g.fillStyle = 'white';
+                g.fillRect(570, 620, 400, 120);
+                
+                // Draw FCN ID text
+                g.fillStyle = 'black';
+                g.font = 'bold 24px "Arial"';
+                g.textAlign = 'center';
+                g.fillText(data.fcn_id, 770, 650);
+                
+                // Draw Barcode
+                g.drawImage(barcodeImg, 595, 660, 350, 60);
+            } catch (e) {
+                console.error('Barcode generation failed:', e.message);
+            }
         }
 
         // Text Styling
+        g.textAlign = 'left';
         g.fillStyle = 'black';
-        g.font = 'bold 34px "AmharicFont"';
-
+        
         // Name
+        g.font = 'bold 36px "AmharicHeadline"';
         if (data.amharic_name) g.fillText(data.amharic_name, 510, 245);
+        g.font = 'bold 36px "Arial"';
         if (data.english_name) g.fillText(data.english_name, 510, 290);
 
-        // Birth Date
+        // Dates
+        g.font = 'bold 34px "Arial"';
         const dob = `${data.birth_date_ethiopian || ''} | ${data.birth_date_gregorian || ''}`;
         g.fillText(dob, 512, 408);
 
-        // Gender
         const gender = `${data.amharic_gender || ''} | ${data.english_gender || ''}`;
         g.fillText(gender, 512, 491);
 
-        // FCN ID (above barcode area) - just text for now
+        const expiry = `${data.expiry_date_ethiopian || ''} | ${data.expiry_date_gregorian || ''}`;
+        g.fillText(expiry, 512, 574);
+
+        // Sidebar Issue Dates (Rotated)
+        g.save();
+        g.translate(26, 560);
+        g.rotate(-Math.PI / 2);
         g.font = 'bold 28px "Arial"';
-        if (data.fcn_id) g.fillText(data.fcn_id, 580, 650);
+        g.fillText(data.issue_date_ethiopian || '', 0, 0);
+        g.restore();
+
+        g.save();
+        g.translate(26, 200);
+        g.rotate(-Math.PI / 2);
+        g.font = 'bold 28px "Arial"';
+        g.fillText(data.issue_date_gregorian || '', 0, 0);
+        g.restore();
 
         // Send Front
-        const frontBuffer = canvas.toBuffer('image/jpeg');
+        const frontBuffer = canvas.toBuffer('image/jpeg', { quality: 0.9 });
         await ctx.replyWithPhoto({ source: frontBuffer }, { caption: '🆔 ID Front Card' });
 
         // --- RENDER BACK ---
@@ -159,20 +241,27 @@ async function renderTemplates(ctx, data) {
         g.drawImage(backTpl, 0, 0, 1280, 800);
 
         g.fillStyle = 'black';
-        g.font = 'bold 32px "AmharicFont"';
+        g.font = 'bold 32px "Arial"';
+        g.textAlign = 'left';
         
         // Phone
-        if (data.phone_number) g.fillText(data.phone_number, 40, 130);
+        if (data.phone_number) g.fillText(data.phone_number, 45, 130);
+
+        // Address Section
+        g.font = 'bold 28px "AmharicFont"';
+        if (data.amharic_city) g.fillText(`ከተማ: ${data.amharic_city}`, 43, 330);
+        if (data.amharic_sub_city) g.fillText(`ክፍለ ከተማ: ${data.amharic_sub_city}`, 43, 370);
+        if (data.amharic_woreda) g.fillText(`ወረዳ: ${data.amharic_woreda}`, 43, 410);
 
         // Send Back
-        const backBuffer = canvas.toBuffer('image/jpeg');
+        const backBuffer = canvas.toBuffer('image/jpeg', { quality: 0.9 });
         await ctx.replyWithPhoto({ source: backBuffer }, { caption: '🆔 ID Back Card' });
 
         ctx.reply('✨ Done! You can now download your cards.');
 
     } catch (error) {
         console.error('Rendering error:', error);
-        ctx.reply('⚠️ Error while rendering the template. Sending raw data instead.');
+        ctx.reply('⚠️ Error while rendering the template. Sending extracted parts instead.');
     }
 }
 
