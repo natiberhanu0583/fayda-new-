@@ -26,7 +26,7 @@ const INITIAL_SESSION = {
     step: 0, images: [], allProcessedData: [],
     templateChoice: 'front-template.jpg',
     backTemplateChoice: 'back-template.jpg',
-    filterChoice: 'color', index: 0
+    filterChoice: 'color', isC: false
 };
 
 bot.start((ctx) => {
@@ -150,14 +150,12 @@ function getFullUrl(p) {
 }
 
 const fontStack = '"EbrimaBold", "Arial"';
+// MATCH WEB DIMENSIONS EXACTLY
 const ID_W = 1280;
-const ID_H = 807;
-const S = (y) => y * (807/800); // Scaling factor for coordinates
+const ID_H = 800;
 
 async function renderAndSendSingleID(ctx, id, idx) {
     const name = id.data.english_name || 'Unnamed';
-    console.log(`Starting render for ID #${idx + 1}: ${name}`);
-    
     const pPath = id.data.images && (id.data.images[1] || id.data.images[0]);
     const mPath = id.data.images && id.data.images[0];
     const qPath = id.data.images && (id.data.images[3] || id.data.images[2]);
@@ -175,19 +173,19 @@ async function renderAndSendSingleID(ctx, id, idx) {
             if (pImg) {
                 g.save();
                 g.filter = id.filter === 'bw' ? 'grayscale(100%) brightness(110%) contrast(110%)' : 'saturate(45%) brightness(100%) grayscale(74%) sepia(10%)';
-                g.drawImage(pImg, 55, S(170), 440, S(540)); 
+                g.drawImage(pImg, 55, 170, 440, 540); 
                 g.restore();
             }
-            if (mImg) g.drawImage(mImg, 1030, S(600), 100, S(130));
+            if (mImg) g.drawImage(mImg, 1030, 600, 100, 130);
             if (id.data.fcn_id) await drawBarcode(g, id.data.fcn_id);
             drawText(g, id.data, id.isTemplateC);
         } else {
             const bTpl = await getCachedTemplate(id.backTemplate);
             g.drawImage(bTpl, 0, 0, ID_W, ID_H);
-            if (qImg) { g.fillStyle='white'; g.fillRect(576, S(40), 666, S(650)); g.drawImage(qImg, 576, S(40), 666, S(650)); }
+            if (qImg) { g.fillStyle='white'; g.fillRect(576, 40, 666, 650); g.drawImage(qImg, 576, 40, 666, 650); }
             drawBackInfo(g, id.data, id.isTemplateC);
         }
-        return canvas.toBuffer('image/jpeg', { quality: 0.85 }); 
+        return canvas.toBuffer('image/jpeg', { quality: 0.90 }); 
     };
 
     const frontBuf = await render(true);
@@ -206,8 +204,8 @@ async function renderAndSendSingleID(ctx, id, idx) {
 bot.action('gen_bulk_jpg', async (ctx) => {
     await ctx.answerCbQuery().catch(() => {});
     const ids = ctx.session.allProcessedData || [];
-    if (!ids.length) return ctx.reply('❌ No IDs found.');
-    await ctx.reply(`🖼 Sending ${ids.length} IDs...`);
+    if (!ids.length) return ctx.reply('❌ No IDs.');
+    await ctx.reply(`🖼 Sending ${ids.length} individual IDs...`);
     for (let i = 0; i < ids.length; i++) {
         try { await renderAndSendSingleID(ctx, ids[i], i); } catch (e) {}
     }
@@ -217,8 +215,7 @@ bot.action('gen_bulk_jpg', async (ctx) => {
 bot.action('gen_word', async (ctx) => {
     await ctx.answerCbQuery().catch(() => {});
     const ids = ctx.session.allProcessedData || [];
-    if (!ids.length) return ctx.reply('❌ No IDs found.');
-    await ctx.reply('📝 Generating Word... ⏳');
+    if (!ids.length) return;
     try {
         const sections = [];
         for (let i = 0; i < ids.length; i++) {
@@ -226,8 +223,8 @@ bot.action('gen_word', async (ctx) => {
             if (r) {
                 sections.push({
                     children: [
-                        new Paragraph({ children: [new ImageRun({ data: r.frontBuf, transformation: { width: 450, height: 284 } })], alignment: AlignmentType.CENTER }),
-                        new Paragraph({ children: [new ImageRun({ data: r.backBuf, transformation: { width: 450, height: 284 } })], alignment: AlignmentType.CENTER })
+                        new Paragraph({ children: [new ImageRun({ data: r.frontBuf, transformation: { width: 500, height: 312 } })], alignment: AlignmentType.CENTER }),
+                        new Paragraph({ children: [new ImageRun({ data: r.backBuf, transformation: { width: 500, height: 312 } })], alignment: AlignmentType.CENTER })
                     ]
                 });
             }
@@ -235,17 +232,17 @@ bot.action('gen_word', async (ctx) => {
         const doc = new Document({ sections });
         const buffer = await Packer.toBuffer(doc);
         await ctx.replyWithDocument({ source: buffer, filename: `Batch_${Date.now()}.docx` });
-    } catch (e) { ctx.reply('❌ Word Error.'); }
+    } catch (e) { ctx.reply('❌ error'); }
 });
 
 async function drawBarcode(g, fcn) {
     try {
         const bBuf = await bwipjs.toBuffer({ bcid: 'code128', text: fcn.replace(/\s/g,''), scale: 3, height: 10, backgroundcolor: 'FFFFFF' });
         const bImg = await loadImage(bBuf);
-        g.fillStyle='white'; g.fillRect(570, S(620), 400, S(120));
+        g.fillStyle='white'; g.fillRect(570, 620, 400, 120);
         g.fillStyle='black'; g.font = `bold 24px ${fontStack}`; g.textAlign='center';
         g.textBaseline = 'top';
-        g.fillText(fcn, 770, S(625)); g.drawImage(bImg, 595, S(660), 350, S(60));
+        g.fillText(fcn, 770, 625); g.drawImage(bImg, 595, 660, 350, 60);
     } catch (e) {}
 }
 
@@ -255,53 +252,56 @@ function drawText(g, d, isC) {
     if (isC) {
         g.textAlign = 'center'; const x = 640;
         g.font = `bold 36px ${fontStack}`;
-        if (d.amharic_name) g.fillText(d.amharic_name, x, S(275));
-        if (d.english_name) g.fillText(d.english_name, x, S(315));
+        if (d.amharic_name) g.fillText(d.amharic_name, x, 275);
+        if (d.english_name) g.fillText(d.english_name, x, 315);
         g.font = `bold 34px ${fontStack}`;
-        g.fillText(`${d.birth_date_ethiopian || ''} | ${d.birth_date_gregorian || ''}`, x, S(445));
-        g.fillText(`${d.amharic_gender || ''} | ${d.english_gender || ''}`, x, S(530));
-        g.fillText(`${d.expiry_date_ethiopian || ''} | ${d.expiry_date_gregorian || ''}`, x, S(615));
-        if (d.fcn_id) { g.font=`bold 32px ${fontStack}`; g.fillText(d.fcn_id, x, S(770)); }
+        g.fillText(`${d.birth_date_ethiopian || ''} | ${d.birth_date_gregorian || ''}`, x, 445);
+        g.fillText(`${d.amharic_gender || ''} | ${d.english_gender || ''}`, x, 530);
+        g.fillText(`${d.expiry_date_ethiopian || ''} | ${d.expiry_date_gregorian || ''}`, x, 615);
+        if (d.fcn_id) { g.font=`bold 32px ${fontStack}`; g.fillText(d.fcn_id, x, 770); }
     } else {
         g.textAlign = 'left'; 
         g.font = `bold 34px ${fontStack}`;
-        if (d.amharic_name) g.fillText(d.amharic_name, 510, S(210));
-        if (d.english_name) g.fillText(d.english_name, 510, S(250));
-        g.fillText(`${d.birth_date_ethiopian || ''} | ${d.birth_date_gregorian || ''}`, 512, S(374));
-        g.fillText(`${d.amharic_gender || ''} | ${d.english_gender || ''}`, 512, S(457));
-        g.fillText(`${d.expiry_date_ethiopian || ''} | ${d.expiry_date_gregorian || ''}`, 512, S(542));
+        // MATCH WEB ABSOLUTE LOCATIONS EXACTLY
+        if (d.amharic_name) g.fillText(d.amharic_name, 510, 210);
+        if (d.english_name) g.fillText(d.english_name, 510, 255); // Adjusted gap
+        
+        g.fillText(`${d.birth_date_ethiopian || ''} | ${d.birth_date_gregorian || ''}`, 512, 374);
+        g.fillText(`${d.amharic_gender || ''} | ${d.english_gender || ''}`, 512, 457);
+        g.fillText(`${d.expiry_date_ethiopian || ''} | ${d.expiry_date_gregorian || ''}`, 512, 542);
         
         g.font = `bold 28px ${fontStack}`;
-        g.save(); g.translate(26, S(560)); g.rotate(-Math.PI/2); g.fillText(d.issue_date_ethiopian||'',0,0); g.restore();
-        g.save(); g.translate(26, S(200)); g.rotate(-Math.PI/2); g.fillText(d.issue_date_gregorian||'',0,0); g.restore();
+        // ISSUE DATES SIDE RAILS
+        g.save(); g.translate(26, 560); g.rotate(-Math.PI/2); g.fillText(d.issue_date_ethiopian||'',0,0); g.restore();
+        g.save(); g.translate(26, 200); g.rotate(-Math.PI/2); g.fillText(d.issue_date_gregorian||'',0,0); g.restore();
     }
 }
 
 function drawBackInfo(g, d, isC) {
     g.fillStyle = 'black'; g.textAlign = 'left'; g.textBaseline = 'top';
     g.font = `bold 32px ${fontStack}`;
-    if (d.phone_number) g.fillText(d.phone_number, 40, S(93));
+    if (d.phone_number) g.fillText(d.phone_number, 40, 93); // Exact web: top 93, left 40
     
-    // Address Section
-    g.font = `bold 28px "EbrimaBold", "AmharicFont", "Arial"`;
-    let y = S(290);
-    if (isC && d.amharic_nationality) { g.fillText(`${d.amharic_nationality} | ${d.english_nationality}`, 43, S(240)); }
+    // Exact web address section: left 43, top 290
+    g.font = `bold 32px "EbrimaBold", "AmharicFont", "Arial"`;
+    let y = 290;
+    if (isC && d.amharic_nationality) { g.fillText(`${d.amharic_nationality} | ${d.english_nationality}`, 43, 220); }
     
-    if (d.amharic_city) { g.fillText(d.amharic_city, 43, y); y += S(35); }
-    if (d.english_city) { g.fillText(d.english_city, 43, y); y += S(45); }
-    if (d.amharic_sub_city) { g.fillText(d.amharic_sub_city, 43, y); y += S(35); }
-    if (d.english_sub_city) { g.fillText(d.english_sub_city, 43, y); y += S(45); }
-    if (d.amharic_woreda) { g.fillText(d.amharic_woreda, 43, y); y += S(35); }
+    if (d.amharic_city) { g.fillText(d.amharic_city, 43, y); y += 40; } // Simulating marginBottom -10 + 20 gap
+    if (d.english_city) { g.fillText(d.english_city, 43, y); y += 55; }
+    if (d.amharic_sub_city) { g.fillText(d.amharic_sub_city, 43, y); y += 40; }
+    if (d.english_sub_city) { g.fillText(d.english_sub_city, 43, y); y += 55; }
+    if (d.amharic_woreda) { g.fillText(d.amharic_woreda, 43, y); y += 40; }
     if (d.english_woreda) { g.fillText(d.english_woreda, 43, y); }
 
     g.font = `bold 30px ${fontStack}`;
-    if (d.fin_number) { g.fillText(d.fin_number, 171, S(800 - 113)); }
+    if (d.fin_number) { g.fillText(d.fin_number, 171, 687); } // 800-113=687
     
     const sn = 'S' + Math.floor(Math.random() * 1000000000).toString().padStart(9, '0');
     g.font = `bold 28px ${fontStack}`; 
-    g.fillText(sn, 1070, S(800 - 27));
+    g.fillText(sn, 1070, 773); // 800-27=773
 }
 
-bot.launch().then(() => console.log('Bot Locations Adjusted to Website Specs!'));
+bot.launch().then(() => console.log('Bot Web Alignment Finalized!'));
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
