@@ -918,7 +918,7 @@ export default function Home() {
                   )}
 
                   {/* Preview All Uploaded IDs */}
-                  {true && ( // Disabled: isMultiScreenshotMode && multiScreenshotSets.some(set => set.some(file => file !== null)) && (
+                  {false && ( // Disabled as requested: isMultiScreenshotMode && multiScreenshotSets.some(set => set.some(file => file !== null)) && (
                     <div className="space-y-4 border-t border-blue-100 pt-6">
                       <h3 className="text-lg font-semibold text-slate-800">Preview All Uploaded IDs</h3>
                       <div className="space-y-4">
