@@ -8,11 +8,19 @@ const FormData = require('form-data');
 const { createCanvas, loadImage, registerFont } = require('canvas');
 const { Document, Packer, Paragraph, ImageRun, AlignmentType } = require('docx');
 
-// Register fonts
+// Register fonts precisely as before
 try {
+    const ebrimaPath = 'C:\\Windows\\Fonts\\ebrima.ttf';
     const ebrimaBoldPath = 'C:\\Windows\\Fonts\\ebrimabd.ttf';
+    if (fs.existsSync(ebrimaPath)) registerFont(ebrimaPath, { family: 'Ebrima' });
     if (fs.existsSync(ebrimaBoldPath)) registerFont(ebrimaBoldPath, { family: 'EbrimaBold' });
-} catch (e) {}
+    
+    // Backup Amharic font
+    const fontPath = path.join(__dirname, 'public', 'NOKIA ኖኪያ ቀላል.TTF');
+    if (fs.existsSync(fontPath)) registerFont(fontPath, { family: 'AmharicFont' });
+} catch (e) {
+    console.error('Font registration failed:', e.message);
+}
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 bot.use(session());
@@ -60,7 +68,9 @@ bot.on('photo', async (ctx) => {
 async function processId(ctx) {
     try {
         const formData = new FormData();
-        const buffers = await Promise.all(ctx.session.images.map(url => 
+        const urls = ctx.session.images;
+        
+        const buffers = await Promise.all(urls.map(url => 
             url ? axios.get(url, { responseType: 'arraybuffer' }).then(r => Buffer.from(r.data)) : Promise.resolve(null)
         ));
 
@@ -104,7 +114,6 @@ bot.action(['style_color', 'style_bw'], async (ctx) => {
         filter: ctx.session.filterChoice
     });
     
-    // Clear images from session to save memory
     ctx.session.images = [];
     ctx.session.step = 0;
 
@@ -140,6 +149,9 @@ function getFullUrl(p) {
     return p.startsWith('http') ? p : `https://api.affiliate.pro.et/${p.startsWith('/') ? p.substring(1) : p}`;
 }
 
+const fontStack = '"EbrimaBold", "Ebrima", "Arial"';
+const amharicStack = '"EbrimaBold", "Ebrima", "AmharicFont"';
+
 async function renderAndSendSingleID(ctx, id, idx) {
     const pPath = id.data.images && (id.data.images[1] || id.data.images[0]);
     const mPath = id.data.images && id.data.images[0];
@@ -157,7 +169,7 @@ async function renderAndSendSingleID(ctx, id, idx) {
             g.drawImage(tpl, 0, 0);
             if (pImg) {
                 g.save();
-                g.filter = id.filter === 'bw' ? 'grayscale(100%) brightness(110%)' : 'saturate(45%) brightness(100%) grayscale(74%) sepia(10%)';
+                g.filter = id.filter === 'bw' ? 'grayscale(100%) brightness(110%) contrast(110%)' : 'saturate(45%) brightness(100%) grayscale(74%) sepia(10%)';
                 g.drawImage(pImg, 55, 170, 440, 540); 
                 g.restore();
             }
@@ -170,7 +182,7 @@ async function renderAndSendSingleID(ctx, id, idx) {
             if (qImg) { g.fillStyle='white'; g.fillRect(576, 40, 666, 650); g.drawImage(qImg, 576, 40, 666, 650); }
             drawBackInfo(g, id.data, id.template.includes('-c'));
         }
-        return canvas.toBuffer('image/jpeg', { quality: 0.75 }); // Optimized quality for speed
+        return canvas.toBuffer('image/jpeg', { quality: 0.85 }); 
     };
 
     const frontBuf = await render(true);
@@ -187,16 +199,12 @@ bot.action('gen_bulk_jpg', async (ctx) => {
     const ids = ctx.session.allProcessedData;
     if (!ids.length) return;
     
-    await ctx.reply(`🖼 Starting download for ${ids.length} persons... ⏳`);
+    await ctx.reply(`🖼 Sending ${ids.length} individual IDs... ⏳`);
     for (let i = 0; i < ids.length; i++) {
-        await ctx.reply(`⏳ Generating files for: ${ids[i].data.english_name || 'Person ' + (i+1)}...`);
-        try {
-            await renderAndSendSingleID(ctx, ids[i], i);
-        } catch (e) {
-            await ctx.reply(`❌ Failed to send files for ID #${i+1}`);
-        }
+        await ctx.reply(`⏳ Sending: ${ids[i].data.english_name || 'Person ' + (i+1)}`);
+        try { await renderAndSendSingleID(ctx, ids[i], i); } catch (e) {}
     }
-    ctx.reply('✨ Bulk individual files sent successfully!');
+    ctx.reply('✨ Done!');
 });
 
 bot.action('gen_word', async (ctx) => {
@@ -204,16 +212,16 @@ bot.action('gen_word', async (ctx) => {
     const ids = ctx.session.allProcessedData;
     if (!ids.length) return;
     
-    await ctx.reply('📝 Generating Printable Word File... ⏳');
+    await ctx.reply('📝 Generating Word File... ⏳');
     try {
         const sections = [];
         for (let i = 0; i < ids.length; i++) {
-            const rendered = await renderAndSendSingleID(ctx, ids[i], i).catch(() => null);
-            if (rendered) {
+            const r = await renderAndSendSingleID(ctx, ids[i], i).catch(() => null);
+            if (r) {
                 sections.push({
                     children: [
-                        new Paragraph({ children: [new ImageRun({ data: rendered.frontBuf, transformation: { width: 500, height: 312 } })], alignment: AlignmentType.CENTER }),
-                        new Paragraph({ children: [new ImageRun({ data: rendered.backBuf, transformation: { width: 500, height: 312 } })], alignment: AlignmentType.CENTER })
+                        new Paragraph({ children: [new ImageRun({ data: r.frontBuf, transformation: { width: 500, height: 312 } })], alignment: AlignmentType.CENTER }),
+                        new Paragraph({ children: [new ImageRun({ data: r.backBuf, transformation: { width: 500, height: 312 } })], alignment: AlignmentType.CENTER })
                     ]
                 });
             }
@@ -221,17 +229,15 @@ bot.action('gen_word', async (ctx) => {
         const doc = new Document({ sections });
         const buffer = await Packer.toBuffer(doc);
         await ctx.replyWithDocument({ source: buffer, filename: `Batch_${Date.now()}.docx` });
-    } catch (e) {
-        ctx.reply('❌ Word generation failed.');
-    }
+    } catch (e) { ctx.reply('❌ Error.'); }
 });
 
 async function drawBarcode(g, fcn) {
     try {
-        const bBuf = await bwipjs.toBuffer({ bcid: 'code128', text: fcn.replace(/\s/g,''), scale: 1.5, height: 10, backgroundcolor: 'FFFFFF' });
+        const bBuf = await bwipjs.toBuffer({ bcid: 'code128', text: fcn.replace(/\s/g,''), scale: 3, height: 10, backgroundcolor: 'FFFFFF' });
         const bImg = await loadImage(bBuf);
         g.fillStyle='white'; g.fillRect(570, 620, 400, 120);
-        g.fillStyle='black'; g.font='bold 24px "EbrimaBold"'; g.textAlign='center';
+        g.fillStyle='black'; g.font = `bold 24px ${fontStack}`; g.textAlign='center';
         g.fillText(fcn, 770, 650); g.drawImage(bImg, 595, 660, 350, 60);
     } catch (e) {}
 }
@@ -239,32 +245,34 @@ async function drawBarcode(g, fcn) {
 function drawText(g, d, isC) {
     g.fillStyle = 'black';
     if (isC) {
-        g.textAlign = 'center'; g.font = 'bold 36px "EbrimaBold"';
-        if (d.amharic_name) g.fillText(d.amharic_name, 640, 275);
-        if (d.english_name) g.fillText(d.english_name, 640, 315);
-        g.font = 'bold 34px "EbrimaBold"';
-        g.fillText(`${d.birth_date_ethiopian || ''} | ${d.birth_date_gregorian || ''}`, 640, 445);
-        g.fillText(`${d.amharic_gender || ''} | ${d.english_gender || ''}`, 640, 530);
-        g.fillText(`${d.expiry_date_ethiopian || ''} | ${d.expiry_date_gregorian || ''}`, 640, 615);
-        if (d.fcn_id) { g.font='bold 32px "EbrimaBold"'; g.fillText(d.fcn_id, 640, 770); }
+        g.textAlign = 'center'; const x = 640;
+        g.font = `bold 36px ${fontStack}`;
+        if (d.amharic_name) g.fillText(d.amharic_name, x, 275);
+        if (d.english_name) g.fillText(d.english_name, x, 315);
+        g.font = `bold 34px ${fontStack}`;
+        g.fillText(`${d.birth_date_ethiopian || ''} | ${d.birth_date_gregorian || ''}`, x, 445);
+        g.fillText(`${d.amharic_gender || ''} | ${d.english_gender || ''}`, x, 530);
+        g.fillText(`${d.expiry_date_ethiopian || ''} | ${d.expiry_date_gregorian || ''}`, x, 615);
+        if (d.fcn_id) { g.font=`bold 32px ${fontStack}`; g.fillText(d.fcn_id, x, 770); }
     } else {
-        g.textAlign = 'left'; g.font = 'bold 36px "EbrimaBold"';
+        g.textAlign = 'left'; 
+        g.font = `bold 36px ${fontStack}`;
         if (d.amharic_name) g.fillText(d.amharic_name, 510, 245);
         if (d.english_name) g.fillText(d.english_name, 510, 290);
-        g.font = 'bold 34px "EbrimaBold"';
+        g.font = `bold 34px ${fontStack}`;
         g.fillText(`${d.birth_date_ethiopian || ''} | ${d.birth_date_gregorian || ''}`, 512, 408);
         g.fillText(`${d.amharic_gender || ''} | ${d.english_gender || ''}`, 512, 491);
         g.fillText(`${d.expiry_date_ethiopian || ''} | ${d.expiry_date_gregorian || ''}`, 512, 574);
-        g.save(); g.translate(36, 560); g.rotate(-Math.PI/2); g.font='bold 28px "EbrimaBold"'; g.fillText(d.issue_date_ethiopian||'',0,0); g.restore();
-        g.save(); g.translate(36, 200); g.rotate(-Math.PI/2); g.font='bold 28px "EbrimaBold"'; g.fillText(d.issue_date_gregorian||'',0,0); g.restore();
+        g.save(); g.translate(36, 560); g.rotate(-Math.PI/2); g.font=`bold 28px ${fontStack}`; g.fillText(d.issue_date_ethiopian||'',0,0); g.restore();
+        g.save(); g.translate(36, 200); g.rotate(-Math.PI/2); g.font=`bold 28px ${fontStack}`; g.fillText(d.issue_date_gregorian||'',0,0); g.restore();
     }
 }
 
 function drawBackInfo(g, d, isC) {
-    g.fillStyle = 'black'; g.textAlign = 'left'; g.font = 'bold 32px "EbrimaBold"';
+    g.fillStyle = 'black'; g.textAlign = 'left'; g.font = `bold 32px ${fontStack}`;
     if (d.phone_number) g.fillText(d.phone_number, 45, 130);
     if (isC) { g.fillText(`${d.amharic_nationality || ''} | ${d.english_nationality || ''}`, 43, 240); }
-    g.font = 'bold 28px "EbrimaBold"';
+    g.font = `bold 28px ${amharicStack}`;
     let y = isC ? 335 : 320;
     if (d.amharic_city) { g.fillText(d.amharic_city, 43, y); y += 35; }
     if (d.english_city) { g.fillText(d.english_city, 43, y); y += 50; }
@@ -272,11 +280,11 @@ function drawBackInfo(g, d, isC) {
     if (d.english_sub_city) { g.fillText(d.english_sub_city, 43, y); y += 50; }
     if (d.amharic_woreda) { g.fillText(d.amharic_woreda, 43, y); y += 35; }
     if (d.english_woreda) { g.fillText(d.english_woreda, 43, y); }
-    if (d.fin_number) { g.font='bold 30px "EbrimaBold"'; g.fillText(d.fin_number, 171, 687); }
+    if (d.fin_number) { g.font=`bold 30px ${fontStack}`; g.fillText(d.fin_number, 171, 687); }
     const sn = 'S' + Math.floor(Math.random() * 1000000000).toString().padStart(9, '0');
-    g.font='bold 28px "EbrimaBold"'; g.fillText(sn, 1070, 762);
+    g.font=`bold 28px ${fontStack}`; g.fillText(sn, 1070, 762);
 }
 
-bot.launch().then(() => console.log('Telegram Bot Final Optimization V3 Starting...'));
+bot.launch().then(() => console.log('Bot Fixed & Running!'));
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
