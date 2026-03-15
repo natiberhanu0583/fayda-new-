@@ -202,6 +202,7 @@ async function renderAndSendSingleID(ctx, id, idx) {
             if (pImg) {
                 g.save();
                 g.filter = id.filter === 'bw' ? 'grayscale(100%) brightness(110%) contrast(110%)' : 'saturate(45%) brightness(100%) grayscale(74%) sepia(10%)';
+                // Move profile picture EXACTLY matching web (55px left, 200px top -> wait web is actually top: 170px for profile!)
                 g.drawImage(pImg, 55, 170, 440, 540); 
                 g.restore();
             }
@@ -272,8 +273,9 @@ async function drawBarcode(g, fcn) {
     try {
         const bBuf = await bwipjs.toBuffer({ bcid: 'code128', text: fcn.replace(/\s/g,''), scale: 3, height: 10, backgroundcolor: 'FFFFFF' });
         const bImg = await loadImage(bBuf);
+        // Barcode block: left 570, top 620
         g.fillStyle='white'; g.fillRect(570, 620, 400, 120);
-        g.fillStyle='black'; g.font = `bold 24px ${fontStack}`; g.textAlign='center';
+        g.fillStyle='black'; g.font = `bold 24px "Arial", sans-serif`; g.textAlign='center';
         g.textBaseline = 'top';
         const spacing = 5;
         const text = fcn;
@@ -303,14 +305,18 @@ function drawText(g, d, isC) {
     } else {
         g.textAlign = 'left'; 
         g.font = `bold 34px ${fontStack}`;
+        // FULL NAME at 510, 210 exactly matching web
         if (d.amharic_name) g.fillText(d.amharic_name, 510, 210 + o);
-        if (d.english_name) g.fillText(d.english_name, 510, 210 + 44 + o);
+        if (d.english_name) g.fillText(d.english_name, 510, 210 + 44 + o); // leading-11 = 44px
+        
+        // DATES exactly matching web
         g.fillText(`${d.birth_date_ethiopian || ''} | ${d.birth_date_gregorian || ''}`, 512, 374 + o);
         g.fillText(`${d.amharic_gender || ''} | ${d.english_gender || ''}`, 512, 457 + o);
         g.fillText(`${d.expiry_date_ethiopian || ''} | ${d.expiry_date_gregorian || ''}`, 512, 542 + o);
+        
         g.font = `bold 28px ${fontStack}`;
-        g.save(); g.translate(20, 560); g.rotate(-Math.PI/2); g.fillText(d.issue_date_ethiopian||'',0,0); g.restore();
-        g.save(); g.translate(20, 200); g.rotate(-Math.PI/2); g.fillText(d.issue_date_gregorian||'',0,0); g.restore();
+        g.save(); g.translate(26, 560); g.rotate(-Math.PI/2); g.fillText(d.issue_date_ethiopian||'',0,0); g.restore();
+        g.save(); g.translate(26, 200); g.rotate(-Math.PI/2); g.fillText(d.issue_date_gregorian||'',0,0); g.restore();
     }
 }
 
@@ -336,6 +342,6 @@ function drawBackInfo(g, d, isC) {
     g.fillText(sn, 1070, 800 - 35);
 }
 
-bot.launch().then(() => console.log('Bot with Cancel Buttons Ready!'));
+bot.launch().then(() => console.log('Bot Align Front Ready!'));
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
