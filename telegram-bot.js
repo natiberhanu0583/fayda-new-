@@ -260,11 +260,38 @@ async function renderTemplates(ctx, data) {
         // Phone
         if (data.phone_number) g.fillText(data.phone_number, 45, 130);
 
-        // Address Section
+        // Address Section (Stacked Amharic & English to match Web)
         g.font = 'bold 28px "EbrimaBold", "Ebrima", "AmharicFont"';
-        if (data.amharic_city) g.fillText(`ከተማ: ${data.amharic_city}`, 43, 330);
-        if (data.amharic_sub_city) g.fillText(`ክፍለ ከተማ: ${data.amharic_sub_city}`, 43, 370);
-        if (data.amharic_woreda) g.fillText(`ወረዳ: ${data.amharic_woreda}`, 43, 410);
+        let currentY = 320;
+        
+        // City
+        if (data.amharic_city) {
+            g.fillText(data.amharic_city, 43, currentY);
+            currentY += 35;
+        }
+        if (data.english_city) {
+            g.fillText(data.english_city, 43, currentY);
+            currentY += 50; // Extra gap between sections
+        }
+
+        // Sub-City
+        if (data.amharic_sub_city) {
+            g.fillText(data.amharic_sub_city, 43, currentY);
+            currentY += 35;
+        }
+        if (data.english_sub_city) {
+            g.fillText(data.english_sub_city, 43, currentY);
+            currentY += 50;
+        }
+
+        // Woreda
+        if (data.amharic_woreda) {
+            g.fillText(data.amharic_woreda, 43, currentY);
+            currentY += 35;
+        }
+        if (data.english_woreda) {
+            g.fillText(data.english_woreda, 43, currentY);
+        }
 
         // FIN Number
         if (data.fin_number) {
