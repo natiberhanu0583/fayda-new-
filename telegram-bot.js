@@ -317,62 +317,31 @@ async function drawBarcode(g, fcn) {
     } catch (e) {}
 }
 
-function drawTextCSS(g, text, x, y, fontSize, lineHeight) {
-    g.textBaseline = 'top';
-    const halfLeading = (lineHeight - fontSize) / 2;
-    g.fillText(text, x, y + halfLeading);
-}
-
-function drawRotatedCSS(g, text, x, y, fontSize, lineHeight, rotationDeg) {
-    g.save();
-    g.translate(x, y); // HTML origin point
-    const originY = lineHeight / 2;
-    g.translate(0, originY);
-    g.rotate(rotationDeg * Math.PI / 180);
-    g.translate(0, -originY);
-    
-    g.textBaseline = 'top';
-    const halfLeading = (lineHeight - fontSize) / 2;
-    g.fillText(text, 0, halfLeading);
-    g.restore();
-}
-
 function drawText(g, d, isC) {
     g.fillStyle = 'black';
-    // Tuning offsets for front card text (if the canvas font renders slightly differently than the browser)
-    const tuneX = 0;
-    const tuneY = 0;
-
+    g.textBaseline = 'top';
+    const o = 5;
     if (isC) {
-        g.textBaseline = 'top';
-        g.textAlign = 'center'; const x = 640 + tuneX;
+        g.textAlign = 'center'; const x = 640;
         g.font = `bold 36px ${fontStack}`;
-        if (d.amharic_name) g.fillText(d.amharic_name, x, 250 + tuneY);
-        if (d.english_name) g.fillText(d.english_name, x, 295 + tuneY);
+        if (d.amharic_name) g.fillText(d.amharic_name, x, 250);
+        if (d.english_name) g.fillText(d.english_name, x, 295);
         g.font = `bold 34px ${fontStack}`;
-        g.fillText(`${d.birth_date_ethiopian || ''} | ${d.birth_date_gregorian || ''}`, x, 420 + tuneY);
-        g.fillText(`${d.amharic_gender || ''} | ${d.english_gender || ''}`, x, 505 + tuneY);
-        g.fillText(`${d.expiry_date_ethiopian || ''} | ${d.expiry_date_gregorian || ''}`, x, 590 + tuneY);
-        if (d.fcn_id) { g.font=`bold 32px ${fontStack}`; g.fillText(d.fcn_id, x, 750 + tuneY); }
+        g.fillText(`${d.birth_date_ethiopian || ''} | ${d.birth_date_gregorian || ''}`, x, 420);
+        g.fillText(`${d.amharic_gender || ''} | ${d.english_gender || ''}`, x, 505);
+        g.fillText(`${d.expiry_date_ethiopian || ''} | ${d.expiry_date_gregorian || ''}`, x, 590);
+        if (d.fcn_id) { g.font=`bold 32px ${fontStack}`; g.fillText(d.fcn_id, x, 750); }
     } else {
         g.textAlign = 'left'; 
         g.font = `bold 34px ${fontStack}`;
-        
-        // Full Names with explicit leading-11 (44px line height)
-        drawTextCSS(g, d.amharic_name||'', 510 + tuneX, 210 + tuneY, 34, 44);
-        drawTextCSS(g, d.english_name||'', 510 + tuneX, 254 + tuneY, 34, 44); 
-        
-        // Dates with implied default tailwind line-height (1.5 -> 51px)
-        drawTextCSS(g, `${d.birth_date_ethiopian || ''} | ${d.birth_date_gregorian || ''}`, 512 + tuneX, 374 + tuneY, 34, 51);
-        drawTextCSS(g, `${d.amharic_gender || ''} | ${d.english_gender || ''}`, 512 + tuneX, 457 + tuneY, 34, 51);
-        drawTextCSS(g, `${d.expiry_date_ethiopian || ''} | ${d.expiry_date_gregorian || ''}`, 512 + tuneX, 542 + tuneY, 34, 51);
-        
+        if (d.amharic_name) g.fillText(d.amharic_name, 510, 210 + o);
+        if (d.english_name) g.fillText(d.english_name, 510, 210 + 44 + o);
+        g.fillText(`${d.birth_date_ethiopian || ''} | ${d.birth_date_gregorian || ''}`, 512, 374 + o);
+        g.fillText(`${d.amharic_gender || ''} | ${d.english_gender || ''}`, 512, 457 + o);
+        g.fillText(`${d.expiry_date_ethiopian || ''} | ${d.expiry_date_gregorian || ''}`, 512, 542 + o);
         g.font = `bold 28px ${fontStack}`;
-        
-        // Issue Dates (Restored to 26px to prevent clipping, waiting for user clarity)
-        const dateX = 26 + tuneX;
-        drawRotatedCSS(g, d.issue_date_ethiopian||'', dateX, 560 + tuneY, 28, 42, -90);
-        drawRotatedCSS(g, d.issue_date_gregorian||'', dateX, 200 + tuneY, 28, 42, -90);
+        g.save(); g.translate(20, 560); g.rotate(-Math.PI/2); g.fillText(d.issue_date_ethiopian||'',0,0); g.restore();
+        g.save(); g.translate(20, 200); g.rotate(-Math.PI/2); g.fillText(d.issue_date_gregorian||'',0,0); g.restore();
     }
 }
 
