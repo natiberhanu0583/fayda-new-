@@ -115,10 +115,25 @@ bot.action(['style_color', 'style_bw'], async (ctx) => {
     await ctx.editMessageText(`✅ ID Added! Total: ${ctx.session.allProcessedData.length}`, 
         Markup.inlineKeyboard([
             [Markup.button.callback('➕ Add Another', 'add_more')],
-            [Markup.button.callback('📄 Shelf (JPG)', 'gen_shelf'), Markup.button.callback('📝 Shelf (Word)', 'gen_word')],
-            [Markup.button.callback('🔄 Restart', 'restart')]
+            [Markup.button.callback('📄 Shelf (JPG)', 'gen_shelf'), Markup.button.callback('🖼 Bulk Individual (JPG)', 'gen_bulk_jpg')],
+            [Markup.button.callback('📝 Shelf (Word)', 'gen_word'), Markup.button.callback('🔄 Restart', 'restart')]
         ])
     );
+});
+
+bot.action('gen_bulk_jpg', async (ctx) => {
+    await ctx.answerCbQuery().catch(() => {});
+    const ids = ctx.session.allProcessedData;
+    if (!ids.length) return;
+    await ctx.reply(`🖼 Sending ${ids.length * 2} individual files... ⏳`);
+
+    const rendered = await renderAllIDs(ids);
+    for (const r of rendered) {
+        const safeName = r.name.replace(/\s+/g, '_');
+        await ctx.replyWithDocument({ source: r.front, filename: `${safeName}_Front.jpg` });
+        await ctx.replyWithDocument({ source: r.back, filename: `${safeName}_Back.jpg` });
+    }
+    ctx.reply('✨ All individual files sent!');
 });
 
 bot.action('add_more', async (ctx) => {
