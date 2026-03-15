@@ -292,16 +292,15 @@ async function drawBarcode(g, fcn) {
         const text = fcn;
         let textWidth = g.measureText(text).width + (text.length * spacing);
         
-        // Exact web box calculation
-        const margin = 10;
-        const contentWidth = Math.max(textWidth, bImg.width + margin*2);
-        const boxWidth = contentWidth + 20; // 10px pad L/R
-        const boxHeight = 10 + 29 + 2 + margin + bImg.height + margin + 10;
+        // Container exactly matching the web layout proportions
+        const boxWidth = 330;
+        const boxHeight = 110;
         
         g.fillStyle = 'white';
+        // Web: top 620, left 570
         g.fillRect(570, 620, boxWidth, boxHeight);
         
-        const textStartX = 570 + 10 + (contentWidth - textWidth)/2;
+        const textStartX = 570 + (boxWidth - textWidth)/2 + 5; // Center text
         g.fillStyle = 'black';
         g.textBaseline = 'top';
         let currX = textStartX;
@@ -310,8 +309,11 @@ async function drawBarcode(g, fcn) {
             currX += g.measureText(text[i]).width + spacing;
         }
         
-        const barStartX = 570 + 10 + (contentWidth - bImg.width)/2;
-        g.drawImage(bImg, barStartX, 671, bImg.width, bImg.height);
+        // Exact height from web (50px), fixed width to prevent distortion
+        const bDrawWidth = 290;
+        const bDrawHeight = 50;
+        const barStartX = 570 + (boxWidth - bDrawWidth)/2;
+        g.drawImage(bImg, barStartX, 665, bDrawWidth, bDrawHeight);
     } catch (e) {}
 }
 
@@ -366,8 +368,9 @@ function drawText(g, d, isC) {
         g.font = `bold 28px ${fontStack}`;
         
         // Issue Dates with origin-left transform and default line height (28 * 1.5 = 42px)
-        drawRotatedCSS(g, d.issue_date_ethiopian||'', 26, 560, 28, 42, -90);
-        drawRotatedCSS(g, d.issue_date_gregorian||'', 26, 200, 28, 42, -90);
+        // User requested moved left small (26 -> 20)
+        drawRotatedCSS(g, d.issue_date_ethiopian||'', 20, 560, 28, 42, -90);
+        drawRotatedCSS(g, d.issue_date_gregorian||'', 20, 200, 28, 42, -90);
     }
 }
 
