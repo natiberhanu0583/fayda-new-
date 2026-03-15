@@ -201,7 +201,7 @@ async function renderAndSendSingleID(ctx, id, idx) {
             g.drawImage(tpl, 0, 0, ID_W, ID_H);
             if (pImg) {
                 g.save();
-                g.filter = id.filter === 'bw' ? 'grayscale(100%) brightness(110%) contrast(110%)' : 'saturate(45%) brightness(100%) grayscale(74%) sepia(10%)';
+                g.filter = id.filter === 'bw' ? 'brightness(122%) sepia(20%) saturate(41%) grayscale(20%)' : 'saturate(45%) brightness(100%) grayscale(74%) sepia(10%)';
                 
                 // CSS object-fit: contain simulation
                 const cw = 440; const ch = 540;
