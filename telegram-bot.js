@@ -2,7 +2,7 @@ const bwipjs = require('bwip-js');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: '.env.local' });
-const { Telegraf, session } = require('telegraf');
+const { Telegraf, session, Markup } = require('telegraf');
 const axios = require('axios');
 const FormData = require('form-data');
 const { createCanvas, loadImage, registerFont } = require('canvas');
@@ -14,30 +14,28 @@ try {
     
     if (fs.existsSync(ebrimaPath)) {
         registerFont(ebrimaPath, { family: 'Ebrima' });
-        console.log('Ebrima font registered');
     }
     if (fs.existsSync(ebrimaBoldPath)) {
         registerFont(ebrimaBoldPath, { family: 'EbrimaBold' });
-        console.log('Ebrima Bold font registered');
     }
 
-    // Keep Nokia fonts as backup
     const fontPath = path.join(__dirname, 'public', 'NOKIA ኖኪያ ቀላል.TTF');
     if (fs.existsSync(fontPath)) registerFont(fontPath, { family: 'AmharicFont' });
+    console.log('Fonts registered');
 } catch (e) {
     console.error('Font registration failed:', e.message);
 }
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
-// Use session to store image state per user
+// Use session to store state per user
 bot.use(session());
 
 const JWT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OTY0YTkyYTBiYzlhMDlmMjdmYjY0YjkiLCJpYXQiOjE3NzMxNjI3ODUsImV4cCI6MTc3Mzc2NzU4NX0.sBYNIOPetKwecdp_aCZZLqUkvAsOY-4hK__wHubL0SY";
 const API_URL = "https://api.affiliate.pro.et/api/v1/process-screenshots";
 
 bot.start((ctx) => {
-    ctx.session = { step: 0, images: [] };
+    ctx.session = { step: 0, images: [], data: null };
     ctx.reply('Welcome! 🇪🇹\nI will help you process your Fayda ID.\n\nPlease upload **Image 1 (Popup/Photo + QR)**. (Or type /skip)');
 });
 
@@ -66,7 +64,7 @@ bot.on('photo', async (ctx) => {
         ctx.session.step = 2;
         ctx.reply('✅ Image 2 received.\nNow please upload **Image 3 (Back ID Card)**.');
     } else if (ctx.session.step === 2) {
-        ctx.reply('🚀 All images received! Generating your ID card... ⏳');
+        ctx.reply('🚀 All images received! Processing data... ⏳');
         await processId(ctx);
     }
 });
@@ -95,31 +93,46 @@ async function processId(ctx) {
         });
 
         if (response.data) {
-            const data = response.data;
-            data.source = 'screenshot'; // Mark as screenshot for bot processing
+            ctx.session.data = response.data;
             
-            // 1. Send Text Info
-            let message = `✅ **ID Processed!**\n\n`;
-            message += `👤 **Name:** ${data.english_name || 'N/A'}\n`;
-            message += `🆔 **FCN:** ${data.fcn_id || 'N/A'}\n`;
-            message += `🗓 **Birth:** ${data.birth_date_gregorian || 'N/A'}\n`;
-            
-            await ctx.replyWithMarkdown(message);
-
-            // 2. Render Template
-            ctx.reply('🎨 **Rendering ID Card Templates...**');
-            await renderTemplates(ctx, data);
-
+            // Ask for Template Choice
+            await ctx.reply('✅ Data Extracted! Now choose your Template:', 
+                Markup.inlineKeyboard([
+                    [Markup.button.callback('Template A (Standard)', 'tpl_a')],
+                    [Markup.button.callback('Template B (Alternative)', 'tpl_b')]
+                ])
+            );
         } else {
             ctx.reply('❌ Failed to process the ID. Please try again.');
         }
     } catch (error) {
         console.error('Error processing ID:', error.message);
         ctx.reply('❌ Error: ' + (error.response?.data?.message || error.message));
-    } finally {
-        ctx.session = { step: 0, images: [] };
     }
 }
+
+// Template Choice Handler
+bot.action(['tpl_a', 'tpl_b'], async (ctx) => {
+    ctx.session.templateChoice = ctx.match === 'tpl_a' ? 'front-template.jpg' : 'front-templateb.jpg';
+    await ctx.answerCbQuery();
+    await ctx.editMessageText('Template selected! Now choose Photo Style:', 
+        Markup.inlineKeyboard([
+            [Markup.button.callback('🌈 Color Photo', 'style_color')],
+            [Markup.button.callback('⚫️ Black & White', 'style_bw')]
+        ])
+    );
+});
+
+// Style Choice Handler
+bot.action(['style_color', 'style_bw'], async (ctx) => {
+    ctx.session.filterChoice = ctx.match === 'style_color' ? 'color' : 'bw';
+    await ctx.answerCbQuery();
+    await ctx.editMessageText('⚙️ Choices saved! Generating your ID cards... ⏳');
+    
+    await renderTemplates(ctx, ctx.session.data);
+    // Reset session after rendering
+    ctx.session = { step: 0, images: [], data: null };
+});
 
 function getFullUrl(path) {
     if (!path) return null;
@@ -134,21 +147,26 @@ async function renderTemplates(ctx, data) {
         const g = canvas.getContext('2d');
 
         // --- RENDER FRONT ---
-        const frontTpl = await loadImage(path.join(__dirname, 'public', 'front-template.jpg'));
+        const templateFile = ctx.session.templateChoice || 'front-template.jpg';
+        const frontTpl = await loadImage(path.join(__dirname, 'public', templateFile));
         g.drawImage(frontTpl, 0, 0, 1280, 800);
 
-        // Photo (Index 1 is usually the profile)
+        // Photo Rendering
         const profilePath = data.images && (data.images[1] || data.images[0]);
         if (profilePath) {
             try {
                 const profileImg = await loadImage(getFullUrl(profilePath));
-                
-                // Apply filters if supported by this canvas version
-                // Saturation: 45%, Brightness: 100%, Grayscale: 74%, Sepia: 10%
                 g.save();
-                if (g.filter !== undefined) {
+                
+                // Apply Filter Choice
+                if (ctx.session.filterChoice === 'bw') {
+                    // Full Black and White
+                    g.filter = 'grayscale(100%) brightness(110%) contrast(110%)';
+                } else {
+                    // Optimized Color (Same as web default)
                     g.filter = 'saturate(45%) brightness(100%) grayscale(74%) sepia(10%)';
                 }
+                
                 g.drawImage(profileImg, 55, 170, 440, 540);
                 g.restore();
             } catch (e) {
@@ -156,15 +174,14 @@ async function renderTemplates(ctx, data) {
             }
         }
         
-        // Mini Photo (Index 0 is usually the original)
+        // Mini Photo
         const miniPath = data.images && data.images[0];
         if (miniPath) {
             try {
                 const miniImg = await loadImage(getFullUrl(miniPath));
-                g.drawImage(miniImg, 1030, 600, 100, 130); // Mini profile pos
+                g.drawImage(miniImg, 1030, 600, 100, 130);
             } catch (e) {}
         }
-
 
         // Barcode
         if (data.fcn_id) {
@@ -179,51 +196,35 @@ async function renderTemplates(ctx, data) {
                     backgroundcolor: 'FFFFFF'
                 });
                 const barcodeImg = await loadImage(barcodeBuffer);
-                // Draw white background for barcode area
                 g.fillStyle = 'white';
                 g.fillRect(570, 620, 400, 120);
-                
-                // Draw FCN ID text
                 g.fillStyle = 'black';
                 g.font = 'bold 24px "Arial"';
                 g.textAlign = 'center';
                 g.fillText(data.fcn_id, 770, 650);
-                
-                // Draw Barcode
                 g.drawImage(barcodeImg, 595, 660, 350, 60);
-            } catch (e) {
-                console.error('Barcode generation failed:', e.message);
-            }
+            } catch (e) {}
         }
 
-        // Text Styling
+        // Text Rendering
         g.textAlign = 'left';
         g.fillStyle = 'black';
-        
-        // Name
         g.font = 'bold 36px "EbrimaBold", "Ebrima", "Arial"';
         if (data.amharic_name) g.fillText(data.amharic_name, 510, 245);
         if (data.english_name) g.fillText(data.english_name, 510, 290);
 
-        // Dates
         g.font = 'bold 34px "EbrimaBold", "Ebrima", "Arial"';
-        const dob = `${data.birth_date_ethiopian || ''} | ${data.birth_date_gregorian || ''}`;
-        g.fillText(dob, 512, 408);
+        g.fillText(`${data.birth_date_ethiopian || ''} | ${data.birth_date_gregorian || ''}`, 512, 408);
+        g.fillText(`${data.amharic_gender || ''} | ${data.english_gender || ''}`, 512, 491);
+        g.fillText(`${data.expiry_date_ethiopian || ''} | ${data.expiry_date_gregorian || ''}`, 512, 574);
 
-        const gender = `${data.amharic_gender || ''} | ${data.english_gender || ''}`;
-        g.fillText(gender, 512, 491);
-
-        const expiry = `${data.expiry_date_ethiopian || ''} | ${data.expiry_date_gregorian || ''}`;
-        g.fillText(expiry, 512, 574);
-
-        // Sidebar Issue Dates (Rotated)
+        // Sides
         g.save();
         g.translate(36, 560);
         g.rotate(-Math.PI / 2);
         g.font = 'bold 28px "EbrimaBold", "Ebrima", "Arial"';
         g.fillText(data.issue_date_ethiopian || '', 0, 0);
         g.restore();
-
         g.save();
         g.translate(36, 200);
         g.rotate(-Math.PI / 2);
@@ -231,7 +232,6 @@ async function renderTemplates(ctx, data) {
         g.fillText(data.issue_date_gregorian || '', 0, 0);
         g.restore();
 
-        // Send Front
         const frontBuffer = canvas.toBuffer('image/jpeg', { quality: 0.9 });
         await ctx.replyWithPhoto({ source: frontBuffer }, { caption: '🆔 ID Front Card' });
 
@@ -240,7 +240,6 @@ async function renderTemplates(ctx, data) {
         const backTpl = await loadImage(path.join(__dirname, 'public', 'back-template.jpg'));
         g.drawImage(backTpl, 0, 0, 1280, 800);
 
-        // QR Code on the Back
         const qrPath = data.images && (data.images[3] || data.images[2]);
         if (qrPath) {
             try {
@@ -248,80 +247,45 @@ async function renderTemplates(ctx, data) {
                 g.fillStyle = 'white';
                 g.fillRect(576, 40, 666, 650);
                 g.drawImage(qrImg, 576, 40, 666, 650);
-            } catch (e) {
-                console.error('Failed to load QR image on back:', e.message);
-            }
+            } catch (e) {}
         }
 
         g.fillStyle = 'black';
-        g.font = 'bold 32px "EbrimaBold", "Ebrima", "Arial"';
-        g.textAlign = 'left';
-        
-        // Phone
+        g.font = 'bold 32px "Ebrima", "Arial"';
         if (data.phone_number) g.fillText(data.phone_number, 45, 130);
 
-        // Address Section (Stacked Amharic & English to match Web)
-        g.font = 'bold 28px "EbrimaBold", "Ebrima", "AmharicFont"';
+        g.font = 'bold 28px "Ebrima", "Arial"';
         let currentY = 320;
-        
-        // City
-        if (data.amharic_city) {
-            g.fillText(data.amharic_city, 43, currentY);
-            currentY += 35;
-        }
-        if (data.english_city) {
-            g.fillText(data.english_city, 43, currentY);
-            currentY += 50; // Extra gap between sections
-        }
+        if (data.amharic_city) { g.fillText(data.amharic_city, 43, currentY); currentY += 35; }
+        if (data.english_city) { g.fillText(data.english_city, 43, currentY); currentY += 50; }
+        if (data.amharic_sub_city) { g.fillText(data.amharic_sub_city, 43, currentY); currentY += 35; }
+        if (data.english_sub_city) { g.fillText(data.english_sub_city, 43, currentY); currentY += 50; }
+        if (data.amharic_woreda) { g.fillText(data.amharic_woreda, 43, currentY); currentY += 35; }
+        if (data.english_woreda) { g.fillText(data.english_woreda, 43, currentY); }
 
-        // Sub-City
-        if (data.amharic_sub_city) {
-            g.fillText(data.amharic_sub_city, 43, currentY);
-            currentY += 35;
-        }
-        if (data.english_sub_city) {
-            g.fillText(data.english_sub_city, 43, currentY);
-            currentY += 50;
-        }
-
-        // Woreda
-        if (data.amharic_woreda) {
-            g.fillText(data.amharic_woreda, 43, currentY);
-            currentY += 35;
-        }
-        if (data.english_woreda) {
-            g.fillText(data.english_woreda, 43, currentY);
-        }
-
-        // FIN Number
         if (data.fin_number) {
-            g.font = 'bold 30px "EbrimaBold", "Ebrima", "Arial"';
-            g.textAlign = 'left';
+            g.font = 'bold 30px "Ebrima", "Arial"';
             g.fillText(data.fin_number, 171, 687);
         }
 
-        // Serial Number
         const serialNumber = 'S' + Math.floor(Math.random() * 1000000000).toString().padStart(9, '0');
-        g.font = 'bold 28px "EbrimaBold", "Ebrima", "Arial"';
-        g.textAlign = 'left';
+        g.font = 'bold 28px "Ebrima", "Arial"';
         g.fillText(serialNumber, 1070, 762);
 
-        // Send Back
         const backBuffer = canvas.toBuffer('image/jpeg', { quality: 0.9 });
         await ctx.replyWithPhoto({ source: backBuffer }, { caption: '🆔 ID Back Card' });
 
-        ctx.reply('✨ Done! You can now download your cards.');
+        ctx.reply('✨ All cards generated successfully!');
 
     } catch (error) {
         console.error('Rendering error:', error);
-        ctx.reply('⚠️ Error while rendering the template. Sending extracted parts instead.');
+        ctx.reply('⚠️ Error during rendering. Please try again.');
     }
 }
 
 bot.launch().then(() => {
-    console.log('Telegram Bot started successfully!');
+    console.log('Telegram Bot started successfully with interactive buttons!');
 });
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
-
