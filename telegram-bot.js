@@ -155,15 +155,6 @@ async function renderTemplates(ctx, data) {
             } catch (e) {}
         }
 
-        // QR Code (Index 3 for screenshots)
-        const qrPath = data.images && (data.images[3] || data.images[2]);
-        if (qrPath) {
-            try {
-                const qrImg = await loadImage(getFullUrl(qrPath));
-                // QR Code position (approximate, usually on the right side)
-                g.drawImage(qrImg, 1070, 175, 150, 150);
-            } catch (e) {}
-        }
 
         // Barcode
         if (data.fcn_id) {
@@ -240,6 +231,22 @@ async function renderTemplates(ctx, data) {
         const backTpl = await loadImage(path.join(__dirname, 'public', 'back-template.jpg'));
         g.drawImage(backTpl, 0, 0, 1280, 800);
 
+        // QR Code on the Back (Moved from Front)
+        const qrPath = data.images && (data.images[3] || data.images[2]);
+        if (qrPath) {
+            try {
+                const qrImg = await loadImage(getFullUrl(qrPath));
+                // Absolute position from web version: top 40px, right 38px
+                // Width 666px, Height 650px
+                // Right is 1280 - 38 - 666 = 576
+                g.fillStyle = 'white';
+                g.fillRect(576, 40, 666, 650);
+                g.drawImage(qrImg, 576, 40, 666, 650);
+            } catch (e) {
+                console.error('Failed to load QR image on back:', e.message);
+            }
+        }
+
         g.fillStyle = 'black';
         g.font = 'bold 32px "Arial"';
         g.textAlign = 'left';
@@ -252,6 +259,21 @@ async function renderTemplates(ctx, data) {
         if (data.amharic_city) g.fillText(`ከተማ: ${data.amharic_city}`, 43, 330);
         if (data.amharic_sub_city) g.fillText(`ክፍለ ከተማ: ${data.amharic_sub_city}`, 43, 370);
         if (data.amharic_woreda) g.fillText(`ወረዳ: ${data.amharic_woreda}`, 43, 410);
+
+        // FIN Number (from web CSS: bottom 113px, left 171px)
+        // bottom 113px = 800 - 113 = 687
+        if (data.fin_number) {
+            g.font = 'bold 30px "Arial"';
+            g.textAlign = 'left';
+            g.fillText(data.fin_number, 171, 687);
+        }
+
+        // Serial Number (from web CSS: left 1070px, bottom 27px)
+        // bottom 27px = 800 - 27 = 773
+        const serialNumber = 'S' + Math.floor(Math.random() * 1000000000).toString().padStart(9, '0');
+        g.font = 'bold 28px "Arial"';
+        g.textAlign = 'left';
+        g.fillText(serialNumber, 1070, 773);
 
         // Send Back
         const backBuffer = canvas.toBuffer('image/jpeg', { quality: 0.9 });
