@@ -32,7 +32,7 @@ import Link from 'next/link';
 const addPointsFormSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   points: z.coerce
-    .number()
+    .number({ message: 'Points must be a number' })
     .int('Points must be a whole number')
     .positive('Points must be positive')
     .min(1, 'Points must be at least 1')
@@ -50,15 +50,12 @@ export default function AddPointsPage() {
   const [recentTransaction, setRecentTransaction] = useState<{message: string; success: boolean; email: string; points: number} | null>(null);
   const session = useSession()
   console.log(session, "session")
+const form = useForm<AddPointsFormValues>({
+  resolver: zodResolver(addPointsFormSchema) as any,
+  defaultValues,
+});
 
-
-
-  const form = useForm<AddPointsFormValues>({
-    resolver: zodResolver(addPointsFormSchema) as unknown,
-    defaultValues,
-  });
-
-  async function onSubmit(data: AddPointsFormValues) {
+async function onSubmit(data: AddPointsFormValues) {
     setLoading(true);
     try {
       const response = await fetch('/api/add-points', {

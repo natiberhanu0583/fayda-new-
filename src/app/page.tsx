@@ -82,7 +82,7 @@ export default function Home() {
   const [customBackTemplate, setCustomBackTemplate] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'pdf' | 'screenshot'>('pdf');
   const [screenshotFiles, setScreenshotFiles] = useState<(File | null)[]>([null, null, null]);
-  const [_isMultiScreenshotMode] = useState(true);
+  const [isMultiScreenshotMode] = useState(true);
   const [multiScreenshotSets, setMultiScreenshotSets] = useState<(File | null)[][]>([]);
   const [activeIdSection, setActiveIdSection] = useState<number | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
