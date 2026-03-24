@@ -85,7 +85,23 @@ export async function POST(request: Request) {
             });
 
             console.log('External API response status:', externalResponse.status);
-            const data = await externalResponse.json();
+            
+            let data: any;
+            const contentType = externalResponse.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                data = await externalResponse.json();
+            } else {
+                const text = await externalResponse.text();
+                console.error('External API returned non-JSON response:', text.substring(0, 200));
+                return NextResponse.json(
+                    { 
+                        message: `External API returned error ${externalResponse.status}`, 
+                        error: 'NON_JSON_RESPONSE',
+                        details: text.substring(0, 500)
+                    },
+                    { status: externalResponse.status }
+                );
+            }
 
             if (!externalResponse.ok) {
                 console.error('External API error data:', data);
