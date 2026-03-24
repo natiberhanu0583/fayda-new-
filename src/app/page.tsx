@@ -377,7 +377,8 @@ export default function Home() {
             if (response.data) {
               const transformedData = {
                 ...response.data,
-                images: (response.data.images || []).map((img: string) => transformImageUrl(img))
+                images: (response.data.images || []).map((img: string) => transformImageUrl(img)),
+                source: 'screenshot' as const
               };
               newExtractedData.push(transformedData);
             }
@@ -433,7 +434,8 @@ export default function Home() {
         if (response.data) {
           const transformedData = {
             ...response.data,
-            images: (response.data.images || []).map((img: string) => transformImageUrl(img))
+            images: (response.data.images || []).map((img: string) => transformImageUrl(img)),
+            source: 'screenshot' as const
           };
           setAllExtractedData([transformedData]);
           fetchUserPoints();
@@ -1281,6 +1283,7 @@ function GeneratedIDCardList({ dataList, customFrontTemplate, customBackTemplate
               <span className="font-semibold text-slate-700">{data.english_name || 'Unknown Name'}</span>
             </div>
             <GeneratedIDCardPreview
+              key={data.fcn_id || index}
               data={data}
               index={index}
               customFrontTemplate={customFrontTemplate}
@@ -1302,12 +1305,12 @@ interface GeneratedIDCardPreviewProps {
 }
 
 function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTemplate }: GeneratedIDCardPreviewProps) {
-  const [selectedProfileImage, setSelectedProfileImage] = useState<string>((data.images && data.images.length > 1) ? data.images[1] : (data.images?.[0] || ''));
+  const [selectedProfileImage, setSelectedProfileImage] = useState<string>(data.images?.[0] || '');
   const [selectedMiniProfileImage, setSelectedMiniProfileImage] = useState<string>(data.images?.[0] || '');
   const [selectedQRCodeImage, setSelectedQRCodeImage] = useState<string>(
     data.source === 'pdf'
-      ? (data.images?.[2] || '')
-      : (data.images?.[3] || data.images?.[2] || '')
+      ? (data.images?.[2] || data.images?.[0] || '')
+      : (data.images?.[3] || data.images?.[2] || data.images?.[1] || data.images?.[0] || '')
   );
   const [serialNumber, setSerialNumber] = useState<string>(generateRandomSerial());
   const [hue, setHue] = useState<number>(0);
@@ -1337,17 +1340,14 @@ function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTe
   // Update selected images when data changes
   useEffect(() => {
     if (data.images && data.images.length > 0) {
-      // Use setTimeout to avoid synchronous setState calls
-      setTimeout(() => {
-        setSelectedProfileImage(data.images.length > 1 ? data.images[1] : data.images[0]);
-        setSelectedMiniProfileImage(data.images[0]);
-        if (data.source === 'pdf') {
-          setSelectedQRCodeImage(data.images[2] || '');
-        } else {
-          setSelectedQRCodeImage(data.images[3] || data.images[2] || '');
-        }
-        setSerialNumber(generateRandomSerial());
-      }, 0);
+      setSelectedProfileImage(data.images[0]);
+      setSelectedMiniProfileImage(data.images[0]);
+      if (data.source === 'pdf') {
+        setSelectedQRCodeImage(data.images[2] || data.images[0]);
+      } else {
+        setSelectedQRCodeImage(data.images[3] || data.images[2] || data.images[1] || data.images[0]);
+      }
+      setSerialNumber(generateRandomSerial());
     }
   }, [data.images, data.source]);
 
