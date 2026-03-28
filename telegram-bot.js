@@ -201,8 +201,8 @@ const ID_H = 800;
 
 async function renderAndSendSingleID(ctx, id, idx) {
     const name = id.data.english_name || 'Unnamed';
-    const pPath = id.data.images && (id.data.images[1] || id.data.images[0]);
-    const mPath = id.data.images && id.data.images[0];
+    const pPath = id.data.images && (id.data.images[0] || id.data.images[1]);
+    const mPath = id.data.images && (id.data.images[1] || id.data.images[0]);
     const qPath = id.data.images && (id.data.images[3] || id.data.images[2]);
 
     const urls = [getFullUrl(pPath), getFullUrl(mPath), getFullUrl(qPath)];
@@ -217,7 +217,7 @@ async function renderAndSendSingleID(ctx, id, idx) {
             g.drawImage(tpl, 0, 0, ID_W, ID_H);
             if (pImg) {
                 g.save();
-                g.filter = id.filter === 'bw' ? 'hue-rotate(0deg) saturate(41%) brightness(122%) contrast(100%) grayscale(20%) sepia(20%)' : 'saturate(45%) brightness(100%) grayscale(74%) sepia(10%)';
+                g.filter = id.filter === 'bw' ? 'hue-rotate(0deg) saturate(41%) brightness(122%) contrast(100%) grayscale(20%) sepia(20%)' : 'saturate(27%) brightness(110%) grayscale(8%) sepia(12%)';
                 // CSS object-fit: contain simulation
                 const cw = 440; const ch = 540;
                 const imgAspect = pImg.width / pImg.height;
