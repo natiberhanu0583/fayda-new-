@@ -1386,9 +1386,7 @@ function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTe
       try {
         const img = new (window as any).Image();
         img.crossOrigin = "anonymous";
-        img.src = selectedProfileImage.startsWith('/') 
-          ? selectedProfileImage 
-          : `https://api.affiliate.pro.et/${selectedProfileImage}`;
+        img.src = transformImageUrl(selectedProfileImage);
         
         await new Promise((resolve, reject) => {
           img.onload = resolve;
@@ -1732,11 +1730,12 @@ function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTe
             >
               {/* Profile Images */}
               {data.images && data.images.length > 0 && (
-                <>
-                  <Image crossOrigin="anonymous"
+                <>                   <Image 
+                    crossOrigin="anonymous"
+                    unoptimized={true}
                     width={440}
                     height={540}
-                    src={processedProfileImage || (selectedProfileImage.startsWith('/') ? selectedProfileImage : `https://api.affiliate.pro.et/${selectedProfileImage}`)}
+                    src={processedProfileImage || transformImageUrl(selectedProfileImage)}
                     alt="Profile"
                     className="absolute"
                     style={{
@@ -1749,10 +1748,13 @@ function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTe
                       filter: `hue-rotate(${hue}deg) saturate(${saturation}%) brightness(${lightness}%) contrast(${contrast}%) grayscale(${grayscale}%) sepia(${sepia}%)`
                     }}
                   />
-                  <Image crossOrigin="anonymous"
+                  <Image 
+                    crossOrigin="anonymous"
+                    unoptimized={true}
                     width={100}
                     height={130}
-                    src={selectedMiniProfileImage.startsWith('/') ? selectedMiniProfileImage : `https://api.affiliate.pro.et/${selectedMiniProfileImage}`}
+                    src={transformImageUrl(selectedMiniProfileImage)}
+
                     alt="Profile"
                     className="absolute"
                     style={{
@@ -1948,10 +1950,12 @@ function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTe
                 height: '650px',
                 backgroundColor: 'rgb(255, 255, 255)'
               }}>
-                <Image crossOrigin="anonymous"
+                <Image 
+                  crossOrigin="anonymous"
+                  unoptimized={true}
                   width={690}
                   height={690}
-                  src={selectedQRCodeImage.startsWith('/') ? selectedQRCodeImage : `https://api.affiliate.pro.et/${selectedQRCodeImage}`}
+                  src={transformImageUrl(selectedQRCodeImage)}
                   alt="QR Code"
                   style={{
                     width: '690px',
