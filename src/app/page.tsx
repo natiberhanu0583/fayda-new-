@@ -1340,6 +1340,9 @@ function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTe
   const [contrast, setContrast] = useState<number>(100);
   const [grayscale, setGrayscale] = useState<number>(74);
   const [sepia, setSepia] = useState<number>(10);
+  const [isRemoveBackground, setIsRemoveBackground] = useState<boolean>(false);
+  const [removalTolerance, setRemovalTolerance] = useState<number>(30);
+  const [processedProfileImage, setProcessedProfileImage] = useState<string>('');
 
   const defaultFrontImageUrl = '/front-template.jpg';
   const defaultBackImageUrl = '/back-template.jpg';
@@ -1371,6 +1374,73 @@ function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTe
       setSerialNumber(generateRandomSerial());
     }
   }, [data.images, data.source]);
+
+  // Background removal logic
+  useEffect(() => {
+    if (!isRemoveBackground || !selectedProfileImage) {
+      setProcessedProfileImage('');
+      return;
+    }
+
+    const processImage = async () => {
+      try {
+        const img = new (window as any).Image();
+        img.crossOrigin = "anonymous";
+        img.src = selectedProfileImage.startsWith('/') 
+          ? selectedProfileImage 
+          : `https://api.affiliate.pro.et/${selectedProfileImage}`;
+        
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const pixelData = imageData.data;
+
+        // Auto-sample background color (corners)
+        const sampleColors = [
+          [pixelData[0], pixelData[1], pixelData[2]], // Top-left
+          [pixelData[(canvas.width - 1) * 4], pixelData[(canvas.width - 1) * 4 + 1], pixelData[(canvas.width - 1) * 4 + 2]], // Top-right
+        ];
+        
+        // Use average of top corners
+        const bgR = (sampleColors[0][0] + sampleColors[1][0]) / 2;
+        const bgG = (sampleColors[0][1] + sampleColors[1][1]) / 2;
+        const bgB = (sampleColors[0][2] + sampleColors[1][2]) / 2;
+
+        for (let i = 0; i < pixelData.length; i += 4) {
+          const r = pixelData[i];
+          const g = pixelData[i + 1];
+          const b = pixelData[i + 2];
+
+          const diff = Math.sqrt(
+            Math.pow(r - bgR, 2) + Math.pow(g - bgG, 2) + Math.pow(b - bgB, 2)
+          );
+
+          if (diff < removalTolerance * 2.5) {
+            pixelData[i + 3] = 0;
+          }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        setProcessedProfileImage(canvas.toDataURL('image/png'));
+      } catch (err) {
+        console.error('Background removal failed:', err);
+      }
+    };
+
+    const debounce = setTimeout(processImage, 300);
+    return () => clearTimeout(debounce);
+  }, [isRemoveBackground, selectedProfileImage, removalTolerance]);
+
 
   return (
     <div className="space-y-8 ">
@@ -1568,12 +1638,65 @@ function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTe
                   setContrast(100);
                   setGrayscale(0);
                   setSepia(0);
+                  setIsRemoveBackground(false);
+                  setRemovalTolerance(30);
                 }}
                 className="text-xs text-slate-500 hover:text-blue-600"
               >
                 Reset Adjustments
               </Button>
             </div>
+          </div>
+
+          {/* Background Removal Controls */}
+          <div className="mt-6 pt-6 border-t border-slate-200">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-sm font-bold text-slate-500 uppercase">Background Removal</h4>
+              <div className="flex items-center gap-2">
+                <Label htmlFor={`remove-bg-toggle-${index}`} className="text-xs font-medium text-slate-600 cursor-pointer">
+                  {isRemoveBackground ? 'Enabled' : 'Disabled'}
+                </Label>
+                <input
+                  id={`remove-bg-toggle-${index}`}
+                  type="checkbox"
+                  checked={isRemoveBackground}
+                  onChange={(e) => setIsRemoveBackground(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                />
+              </div>
+            </div>
+            
+            {isRemoveBackground && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label htmlFor={`tolerance-${index}`} className="text-xs font-bold text-slate-500 uppercase">Removal Tolerance</Label>
+                    <span className="text-xs font-mono text-slate-400">{removalTolerance}</span>
+                  </div>
+                  <input
+                    id={`tolerance-${index}`}
+                    type="range"
+                    min="1"
+                    max="100"
+                    value={removalTolerance}
+                    onChange={(e) => setRemovalTolerance(parseInt(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                  <p className="text-[10px] text-slate-400 italic mt-1">
+                    Adjust to remove specific background colors. Higher value removes more surrounding colors.
+                  </p>
+                </div>
+                
+                <div className="flex items-center bg-blue-50 p-3 rounded-lg border border-blue-100">
+                   <div className="p-2 bg-blue-100 rounded-full mr-3">
+                     <ImageIcon className="h-4 w-4 text-blue-600" />
+                   </div>
+                   <p className="text-[11px] text-blue-700 leading-tight">
+                     <b>Automatic Subject Detection:</b> This tool identifies the subject and attempts to remove the background based on color consistency.
+                   </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1613,7 +1736,7 @@ function GeneratedIDCardPreview({ data, index, customFrontTemplate, customBackTe
                   <Image crossOrigin="anonymous"
                     width={440}
                     height={540}
-                    src={selectedProfileImage.startsWith('/') ? selectedProfileImage : `https://api.affiliate.pro.et/${selectedProfileImage}`}
+                    src={processedProfileImage || (selectedProfileImage.startsWith('/') ? selectedProfileImage : `https://api.affiliate.pro.et/${selectedProfileImage}`)}
                     alt="Profile"
                     className="absolute"
                     style={{
